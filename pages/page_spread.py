@@ -1,9 +1,9 @@
 """
 pages/page_spread.py
-Nifty 50 vs Gold BeES Return Spread
+Return Spread — any two instruments
 ─────────────────────────────────────
 Plots the rolling return difference:
-    Spread = Rolling-N-day return (Nifty 50)  −  Rolling-N-day return (Gold BeES)
+    Spread = Rolling-N-day return (A)  −  Rolling-N-day return (B)
 
 With statistical benchmark lines:
     Avg diff, +1σ, +2σ, −1σ, −2σ
@@ -17,13 +17,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from data.index_store import get_price, get_min_start
-
-# ── Hardcoded instruments ──────────────────────────────────────────────────────
-_TICKER_A  = "^NSEI"
-_NAME_A    = "Nifty 50"
-_TICKER_B  = "GOLDBEES.NS"
-_NAME_B    = "Gold BeES (Nippon)"
+from data.index_store import get_price, get_min_start, INSTRUMENTS
 
 # ── Theme ──────────────────────────────────────────────────────────────────────
 _BG    = "#0D1117"
@@ -41,6 +35,34 @@ _FONT  = "IBM Plex Mono, monospace"
 
 _H          = 460
 DATA_START  = "2006-01-01"
+
+# ── Preset pairs ──────────────────────────────────────────────────────────────
+# (label shown in dropdown, ticker_A, name_A, ticker_B, name_B)
+_PRESET_PAIRS: list[tuple[str, str, str, str, str]] = [
+    # ── Segment spreads vs Nifty 50 ──────────────────────────────────────────
+    ("Nifty Smallcap 100 − Nifty 50",  "^CNXSMALL",  "Nifty Smallcap 100", "^NSEI",       "Nifty 50"),
+    ("Nifty Midcap 100 − Nifty 50",    "^NSMIDCP",   "Nifty Midcap 100",   "^NSEI",       "Nifty 50"),
+    ("Nifty Bank − Nifty 50",          "^NSEBANK",   "Nifty Bank",         "^NSEI",       "Nifty 50"),
+    ("Nifty IT − Nifty 50",            "^CNXIT",     "Nifty IT",           "^NSEI",       "Nifty 50"),
+    ("Nifty Pharma − Nifty 50",        "^CNXPHARMA", "Nifty Pharma",       "^NSEI",       "Nifty 50"),
+    ("Nifty Auto − Nifty 50",          "^CNXAUTO",   "Nifty Auto",         "^NSEI",       "Nifty 50"),
+    ("Nifty FMCG − Nifty 50",         "^CNXFMCG",   "Nifty FMCG",         "^NSEI",       "Nifty 50"),
+    ("Nifty Metal − Nifty 50",         "^CNXMETAL",  "Nifty Metal",        "^NSEI",       "Nifty 50"),
+    ("Nifty Energy − Nifty 50",        "^CNXENERGY", "Nifty Energy",       "^NSEI",       "Nifty 50"),
+    ("Nifty Realty − Nifty 50",        "^CNXREALTY", "Nifty Realty",       "^NSEI",       "Nifty 50"),
+    # ── Nifty 50 vs alternatives ─────────────────────────────────────────────
+    ("Nifty 50 − Gold BeES",           "^NSEI",      "Nifty 50",           "GOLDBEES.NS", "Gold BeES (Nippon)"),
+    ("Nifty 50 − S&P 500",             "^NSEI",      "Nifty 50",           "^GSPC",       "S&P 500"),
+    ("Nifty 50 − Crude Oil (WTI)",     "^NSEI",      "Nifty 50",           "CL=F",        "Crude Oil (WTI)"),
+    # ── Segment spreads within mid/small ─────────────────────────────────────
+    ("Nifty Smallcap 100 − Midcap 100","^CNXSMALL",  "Nifty Smallcap 100", "^NSMIDCP",    "Nifty Midcap 100"),
+    ("Nifty Bank − Nifty IT",          "^NSEBANK",   "Nifty Bank",         "^CNXIT",      "Nifty IT"),
+    # ── Custom ────────────────────────────────────────────────────────────────
+    ("⚙ Custom (pick any two)",        "",           "",                   "",            ""),
+]
+
+_PRESET_LABELS = [p[0] for p in _PRESET_PAIRS]
+_PRESET_MAP    = {p[0]: p for p in _PRESET_PAIRS}
 
 
 # ── Date filter ────────────────────────────────────────────────────────────────
@@ -96,10 +118,12 @@ def _rolling_return(s: pd.Series, window: int) -> pd.Series:
 def _compute_spread(
     s_a: pd.Series,
     s_b: pd.Series,
+    ticker_a: str,
+    ticker_b: str,
     window: int,
 ) -> tuple[pd.Series, pd.Series, pd.Series]:
-    min_a = pd.Timestamp(get_min_start(_TICKER_A))
-    min_b = pd.Timestamp(get_min_start(_TICKER_B))
+    min_a = pd.Timestamp(get_min_start(ticker_a))
+    min_b = pd.Timestamp(get_min_start(ticker_b))
     effective_start = max(min_a, min_b)
 
     s_a = s_a[s_a.index >= effective_start]
@@ -181,6 +205,8 @@ def plot_spread_with_bands(
     spread: pd.Series,
     stats: dict,
     window_label: str,
+    name_a: str,
+    name_b: str,
 ) -> go.Figure:
     mean = stats["mean"]
     std  = stats["std"]
@@ -195,7 +221,7 @@ def plot_spread_with_bands(
 
     span_years = (spread.index[-1] - spread.index[0]).days / 365.25 if len(spread) >= 2 else 99
     fig = _base_fig(
-        f"Return Spread  ·  {_NAME_A} − {_NAME_B}  ({window_label})",
+        f"Return Spread  ·  {name_a} − {name_b}  ({window_label})",
         right_margin=200,
         span_years=span_years,
     )
@@ -227,7 +253,7 @@ def plot_spread_with_bands(
     # Main spread line
     fig.add_trace(go.Scatter(
         x=spread.index, y=spread,
-        name=f"{_NAME_A} − {_NAME_B}",
+        name=f"{name_a} − {name_b}",
         mode="lines",
         line=dict(color=_BLUE, width=2),
         fill="tozeroy",
@@ -249,22 +275,24 @@ def plot_spread_with_bands(
 def plot_rolling_returns(
     ra: pd.Series, rb: pd.Series,
     window_label: str,
+    name_a: str,
+    name_b: str,
 ) -> go.Figure:
     span_years = (ra.index[-1] - ra.index[0]).days / 365.25 if len(ra) >= 2 else 99
     fig = _base_fig(
-        f"Rolling {window_label} Return  ·  {_NAME_A}  vs  {_NAME_B}",
+        f"Rolling {window_label} Return  ·  {name_a}  vs  {name_b}",
         right_margin=40,
         span_years=span_years,
     )
     fig.add_trace(go.Scatter(
-        x=ra.index, y=ra, name=_NAME_A,
+        x=ra.index, y=ra, name=name_a,
         line=dict(color=_BLUE, width=1.8),
-        hovertemplate="%{y:.1f}%<extra>" + _NAME_A + "</extra>",
+        hovertemplate="%{y:.1f}%<extra>" + name_a + "</extra>",
     ))
     fig.add_trace(go.Scatter(
-        x=rb.index, y=rb, name=_NAME_B,
+        x=rb.index, y=rb, name=name_b,
         line=dict(color=_ORG, width=1.8),
-        hovertemplate="%{y:.1f}%<extra>" + _NAME_B + "</extra>",
+        hovertemplate="%{y:.1f}%<extra>" + name_b + "</extra>",
     ))
     fig.add_hline(y=0, line=dict(color=_GREY, width=0.7, dash="dot"))
     return fig
@@ -283,12 +311,51 @@ def render() -> None:
             </span>
             <span style='font-size:13px;color:#8B949E;margin-left:16px;
                          font-family:IBM Plex Mono,monospace'>
-                Nifty 50 − Gold BeES &nbsp;·&nbsp; with Avg / ±1σ / ±2σ bands
+                Any two instruments &nbsp;·&nbsp; Rolling return diff with Avg / ±1σ / ±2σ bands
             </span>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    # ── Pair selector ─────────────────────────────────────────────────────────
+    pair_label = st.selectbox(
+        "Select pair",
+        _PRESET_LABELS,
+        index=0,            # default: Nifty Smallcap 100 − Nifty 50
+        key="sp_pair",
+        label_visibility="visible",
+    )
+
+    chosen_pair = _PRESET_MAP[pair_label]
+    is_custom   = (chosen_pair[1] == "")   # the ⚙ Custom entry
+
+    if is_custom:
+        # ── Custom: two dropdowns ─────────────────────────────────────────────
+        all_names = list(INSTRUMENTS.keys())
+        cc1, cc2 = st.columns(2)
+        with cc1:
+            name_a_sel = st.selectbox(
+                "Instrument A (top / first)",
+                all_names,
+                index=all_names.index("Nifty 50") if "Nifty 50" in all_names else 0,
+                key="sp_custom_a",
+            )
+        with cc2:
+            name_b_sel = st.selectbox(
+                "Instrument B (bottom / subtracted)",
+                all_names,
+                index=all_names.index("Gold BeES (Nippon)") if "Gold BeES (Nippon)" in all_names else 1,
+                key="sp_custom_b",
+            )
+        ticker_a = INSTRUMENTS[name_a_sel]
+        ticker_b = INSTRUMENTS[name_b_sel]
+        name_a   = name_a_sel
+        name_b   = name_b_sel
+    else:
+        _, ticker_a, name_a, ticker_b, name_b = chosen_pair
+
+    st.divider()
 
     # ── Window + date filter ─────────────────────────────────────────────────
     wc, dc = st.columns([2, 8])
@@ -313,25 +380,27 @@ def render() -> None:
         date_from, date_to = _date_filter()
 
     # ── Data fetch ────────────────────────────────────────────────────────────
-    with st.spinner(f"Loading {_NAME_A} and {_NAME_B}…"):
-        s_a_raw, status_a = get_price(_TICKER_A, start_date=DATA_START)
-        s_b_raw, status_b = get_price(_TICKER_B, start_date=DATA_START)
+    with st.spinner(f"Loading {name_a} and {name_b}…"):
+        s_a_raw, status_a = get_price(ticker_a, start_date=DATA_START)
+        s_b_raw, status_b = get_price(ticker_b, start_date=DATA_START)
 
     if s_a_raw.empty:
         st.error(
-            f"❌ **{_NAME_A}** — Could not fetch data.\n\n"
+            f"❌ **{name_a}** — Could not fetch data.\n\n"
             f"`{status_a['message']}`"
         )
         return
     if s_b_raw.empty:
         st.error(
-            f"❌ **{_NAME_B}** — Could not fetch data.\n\n"
+            f"❌ **{name_b}** — Could not fetch data.\n\n"
             f"`{status_b['message']}`"
         )
         return
 
     # ── Compute spread (full history → accurate SD bands) ────────────────────
-    ra_full, rb_full, spread_full = _compute_spread(s_a_raw, s_b_raw, window)
+    ra_full, rb_full, spread_full = _compute_spread(
+        s_a_raw, s_b_raw, ticker_a, ticker_b, window
+    )
 
     if spread_full.empty:
         st.error("Not enough overlapping history. Try a shorter rolling window.")
@@ -362,7 +431,7 @@ def render() -> None:
     m1, m2, m3, m4, m5 = st.columns(5)
     with m1:
         st.metric("Current Spread", f"{last:+.2f}%",
-                  help=f"Latest rolling {wlabel} return: {_NAME_A} − {_NAME_B}")
+                  help=f"Latest rolling {wlabel} return: {name_a} − {name_b}")
     with m2:
         st.metric("Avg Diff (full hist)", f"{mean:+.2f}%",
                   help=f"Full-history average ({eff_start} → today)")
@@ -380,41 +449,43 @@ def render() -> None:
 
     # ── Chart 1 (full width): Spread + SD bands ───────────────────────────────
     st.plotly_chart(
-        plot_spread_with_bands(spread_view, stats, wlabel),
+        plot_spread_with_bands(spread_view, stats, wlabel, name_a, name_b),
         use_container_width=True,
     )
 
     # ── Chart 2 (full width): Individual rolling returns ──────────────────────
     st.plotly_chart(
-        plot_rolling_returns(ra_view, rb_view, wlabel),
+        plot_rolling_returns(ra_view, rb_view, wlabel, name_a, name_b),
         use_container_width=True,
     )
 
     # ── Raw data expander ─────────────────────────────────────────────────────
     with st.expander("📋 Raw data", expanded=False):
         raw_df = pd.DataFrame({
-            f"{_NAME_A} {wlabel} Return (%)": ra_view,
-            f"{_NAME_B} {wlabel} Return (%)": rb_view,
-            "Spread (A − B) (%)":              spread_view,
-            "Avg (%)":                         mean,
-            "+2σ (%)":                         mean + 2*std,
-            "+1σ (%)":                         mean + std,
-            "−1σ (%)":                         mean - std,
-            "−2σ (%)":                         mean - 2*std,
+            f"{name_a} {wlabel} Return (%)": ra_view,
+            f"{name_b} {wlabel} Return (%)": rb_view,
+            "Spread (A − B) (%)":            spread_view,
+            "Avg (%)":                        mean,
+            "+2σ (%)":                        mean + 2*std,
+            "+1σ (%)":                        mean + std,
+            "−1σ (%)":                        mean - std,
+            "−2σ (%)":                        mean - 2*std,
         })
         raw_df.index = raw_df.index.date
         st.dataframe(
             raw_df.sort_index(ascending=False).style.format("{:.2f}"),
             use_container_width=True, height=320,
         )
+        safe_a = name_a.replace(" ", "_").replace("/", "-")
+        safe_b = name_b.replace(" ", "_").replace("/", "-")
         st.download_button(
             "⬇ Download CSV",
             data=raw_df.to_csv(),
-            file_name="nifty50_vs_goldbees_spread.csv",
+            file_name=f"{safe_a}_vs_{safe_b}_spread.csv",
             mime="text/csv",
         )
 
     with st.expander("📡 Data sources", expanded=False):
-        for name, status in [(_NAME_A, status_a), (_NAME_B, status_b)]:
+        for name, status in [(name_a, status_a), (name_b, status_b)]:
             ok = "✅" if status["success"] else "⚠️"
             st.caption(f"{ok} **{name}**: {status['message']}")
