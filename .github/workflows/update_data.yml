@@ -1,0 +1,53 @@
+name: Update Daily Market Data
+
+on:
+  schedule:
+    # 5:30 PM IST = 12:00 UTC  (NSE archives usually published by 5pm IST)
+    # Runs Mon–Fri only
+    - cron: '0 12 * * 1-5'
+
+  # Also allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to push commits back to the repo
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --quiet \
+            pandas requests yfinance \
+            curl_cffi beautifulsoup4 lxml
+
+      - name: Run data update script
+        run: python scripts/update_live_data.py
+
+      - name: Commit and push updated live files
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add data/live/
+
+          # Only commit if something actually changed
+          if git diff --staged --quiet; then
+            echo "No changes — nothing to commit."
+          else
+            git commit -m "auto: daily data update $(date -u +%Y-%m-%d)"
+            git push
+            echo "Pushed updated data."
+          fi
