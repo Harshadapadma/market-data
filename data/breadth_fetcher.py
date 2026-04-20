@@ -97,25 +97,52 @@ def _nifty_symbols_from_csv(slug: str) -> list[str]:
     return []
 
 
-def fetch_constituent_list(universe_name: str, max_age_hours: int = 24) -> list[str]:
+def fetch_constituent_list(universe_name: str, max_age_hours: int = 168) -> list[str]:
+    """
+    Return constituent symbols for `universe_name`.
+
+    Cache policy:
+    • Serve from cache if < max_age_hours old (default 7 days).
+    • If stale, try to refresh from NSE.
+    • If NSE is unreachable, ALWAYS fall back to the stale cache rather
+      than returning an empty list — constituents rarely change dramatically.
+    """
     info  = UNIVERSE_CATALOG[universe_name]
     slug  = info["nse_slug"]
     cache = _CONST_DIR / f"{slug}.csv"
 
+    # ── Serve from cache if fresh enough ─────────────────────────────────────
     if cache.exists():
         age_h = (time.time() - cache.stat().st_mtime) / 3600
         if age_h < max_age_hours:
-            return pd.read_csv(cache)["symbol"].tolist()
+            syms = pd.read_csv(cache)["symbol"].tolist()
+            if syms:
+                return syms
 
-    symbols = _nifty_symbols_from_csv(slug)
+    # ── Try live fetch from NSE ───────────────────────────────────────────────
+    symbols: list[str] = []
+    try:
+        symbols = _nifty_symbols_from_csv(slug)
+    except Exception as exc:
+        log.warning("NSE constituent fetch raised: %s", exc)
+
     if symbols:
         pd.DataFrame({"symbol": symbols}).to_csv(cache, index=False)
-        log.info("Fetched %d symbols for %s", len(symbols), universe_name)
-    elif cache.exists():
-        log.warning("NSE fetch failed; using stale cache for %s", universe_name)
-        return pd.read_csv(cache)["symbol"].tolist()
+        log.info("Refreshed %d symbols for %s", len(symbols), universe_name)
+        return symbols
 
-    return symbols
+    # ── Always fall back to stale cache (NSE down / blocked) ─────────────────
+    if cache.exists():
+        syms = pd.read_csv(cache)["symbol"].tolist()
+        if syms:
+            log.warning(
+                "NSE unreachable — using stale constituent cache for %s (%d symbols)",
+                universe_name, len(syms),
+            )
+            return syms
+
+    log.error("No constituent data at all for %s", universe_name)
+    return []
 
 
 def tickers_for_universe(universe_name: str) -> list[str]:

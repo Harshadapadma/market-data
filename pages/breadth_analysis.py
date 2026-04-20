@@ -400,91 +400,85 @@ def render_breadth_analysis() -> None:
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
-    # ── Main fetch-and-compute flow ───────────────────────────────────────────
-    if not fetch_btn:
-        # Check if we have cached results from a previous run in session
-        cached_result = st.session_state.get("breadth_result")
-        if cached_result and cached_result.get("universe") == universe_name \
-                and cached_result.get("benchmark") == benchmark_name \
-                and cached_result.get("window") == window_days:
-            _render_results(
-                cached_result["breadth_df"],
-                cached_result["bench_series"],
-                cached_result["snapshot_df"],
-                cached_result["bench_ret"],
-                universe_name, benchmark_name, window_label,
-                date_from, date_to, show_dist, show_snapshot, show_bench_px,
-            )
-        else:
-            st.info(
-                "👈 Select Universe, Benchmark, and Window in the sidebar, "
-                "then click **🚀 Fetch & Analyse**."
-            )
-            st.markdown(
-                f"""
-                <div style='background:{_BG2};border:1px solid {_BORDER};
-                            border-radius:8px;padding:16px 20px;
-                            font-family:{_FONT};font-size:11px;color:{_GREY}'>
-                    <b style='color:{_WHITE}'>ℹ️ How it works</b><br><br>
-                    1. Fetches current {universe_name} constituents from NSE<br>
-                    2. Downloads historical daily prices via yfinance (cached locally)<br>
-                    3. At each month-end, computes each stock's {window_label} return<br>
-                    4. Counts how many beat the {benchmark_name}'s {window_label} return<br>
-                    5. Plots that percentage over time<br><br>
-                    <b style='color:{_YELLOW}'>⚡ First run</b>: ~60–120s for 500 stocks.
-                    Subsequent runs: &lt;5s from cache.<br><br>
-                    <b style='color:{_RED}'>⚠️ Note</b>: Uses <i>current</i> index 
-                    constituents applied historically (survivorship bias applies).
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    # ── Decide whether to auto-load or wait for button ───────────────────────
+    # Count how many stock price files are already cached locally.
+    # If we have data for ≥ 80% of the universe we auto-run on page open —
+    # no button click needed.  "Fetch & Analyse" still forces a full refresh.
+    from data.breadth_fetcher import _PRICE_DIR as _PD
+    _cached_count = len(list(_PD.glob("*.csv")))
+    _approx_size  = UNIVERSE_CATALOG[universe_name]["approx_size"]
+    _auto_run     = (_cached_count >= int(_approx_size * 0.8))
+
+    # Session state: re-use last computed result when only the date filter changes
+    cached_result = st.session_state.get("breadth_result")
+    _session_hit  = (
+        cached_result is not None
+        and cached_result.get("universe")   == universe_name
+        and cached_result.get("benchmark")  == benchmark_name
+        and cached_result.get("window")     == window_days
+    )
+
+    if not fetch_btn and not _auto_run and not _session_hit:
+        # Truly first-ever run — show a helpful message
+        st.info(
+            "No local data found yet. Click **Fetch & Analyse** above to download "
+            "price data for all ~500 stocks (takes ~2 minutes once, then instant)."
+        )
         return
 
-    # ── Fetch + Compute ───────────────────────────────────────────────────────
+    if not fetch_btn and _session_hit:
+        # Already computed this session — just re-render with new date filter
+        _render_results(
+            cached_result["breadth_df"],
+            cached_result["bench_series"],
+            cached_result["snapshot_df"],
+            cached_result["bench_ret"],
+            universe_name, benchmark_name, window_label,
+            date_from, date_to, show_dist, show_snapshot, show_bench_px,
+        )
+        return
+
+    # ── Fetch + Compute (runs on button click OR on auto-load) ───────────────
     freq_map = {"Monthly": "BME", "Weekly": "W-FRI", "Daily": "B"}
     freq = freq_map.get(agg_freq, "BME")
 
-    with st.status("Fetching benchmark data…", expanded=True) as status:
+    _expand = fetch_btn   # show progress details only when user explicitly clicked
+    with st.status("Loading data…", expanded=_expand) as status:
         bench_ticker  = bench_info["ticker"]
         bench_series  = fetch_single_price(bench_ticker)
         if bench_series.empty:
             st.error(f"Could not fetch benchmark data for {benchmark_name} ({bench_ticker})")
             return
-        st.write(f"✅ Benchmark: {len(bench_series):,} daily prices for {benchmark_name}")
+        if _expand:
+            st.write(f"✅ Benchmark: {len(bench_series):,} daily prices for {benchmark_name}")
 
-        st.write(f"📋 Fetching constituent list for {universe_name}…")
         tickers = tickers_for_universe(universe_name)
         if not tickers:
             st.error(
-                f"Could not fetch constituent list for {universe_name}. "
-                "NSE server may be unreachable. Try again later."
+                f"Could not load constituent list for {universe_name}. "
+                "NSE unreachable and no local cache found. Try again later."
             )
             return
-        st.write(f"✅ {len(tickers)} stocks in {universe_name}")
+        if _expand:
+            st.write(f"✅ {len(tickers)} stocks in {universe_name}")
 
-        # Progress state
-        prog_text  = st.empty()
-        prog_bar   = st.progress(0.0)
+        prog_text = st.empty()
+        prog_bar  = st.progress(0.0)
 
         def _progress(done: int, total: int, ticker: str) -> None:
             frac = done / total if total else 0
             prog_bar.progress(frac)
-            prog_text.write(
-                f"⬇️ Downloading prices: {done}/{total} tickers… ({ticker})"
-            )
+            if _expand:
+                prog_text.write(f"⬇️ {done}/{total} tickers… ({ticker})")
 
-        st.write(f"⬇️ Downloading price data (cached tickers load instantly)…")
         prices_df = fetch_prices_batch(tickers, progress_cb=_progress)
         prog_bar.empty()
         prog_text.empty()
 
         if prices_df.empty:
-            st.error("No price data could be fetched for the universe stocks.")
+            st.error("No price data available.")
             return
-        st.write(f"✅ Price data: {prices_df.shape[1]} stocks × {len(prices_df):,} days")
 
-        st.write(f"⚙️ Computing breadth series ({agg_freq.lower()}, {window_label})…")
         breadth_df = compute_breadth_series(
             prices_df,
             bench_series,
@@ -494,28 +488,22 @@ def render_breadth_analysis() -> None:
         )
 
         if breadth_df.empty:
-            st.error(
-                "Breadth computation returned no data. "
-                "Try a shorter window or wider date range."
-            )
+            st.error("Breadth computation returned no data.")
             return
-        st.write(f"✅ Breadth computed: {len(breadth_df)} data points")
 
-        st.write("📸 Building latest snapshot…")
         snapshot_df, bench_ret = get_latest_snapshot(
             prices_df, bench_series, window_days, universe_name
         )
         status.update(label="✅ Done!", state="complete", expanded=False)
 
-    # Cache in session state
     st.session_state["breadth_result"] = {
-        "universe":    universe_name,
-        "benchmark":   benchmark_name,
-        "window":      window_days,
-        "breadth_df":  breadth_df,
+        "universe":     universe_name,
+        "benchmark":    benchmark_name,
+        "window":       window_days,
+        "breadth_df":   breadth_df,
         "bench_series": bench_series,
-        "snapshot_df": snapshot_df,
-        "bench_ret":   bench_ret,
+        "snapshot_df":  snapshot_df,
+        "bench_ret":    bench_ret,
     }
 
     _render_results(
