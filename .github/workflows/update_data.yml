@@ -36,12 +36,14 @@ jobs:
       - name: Run data update script
         run: python scripts/update_live_data.py
 
-      - name: Commit and push updated live files
+      - name: Commit and push updated files
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          # Stage live data + stock price cache (so Streamlit Cloud deploys with full cache)
           git add data/live/
+          git add cache/
 
           # Only commit if something actually changed
           if git diff --staged --quiet; then

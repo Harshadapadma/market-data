@@ -193,7 +193,6 @@ dmypy.json
 # Coverage
 
 # Local project files (optional)
-cache/
 # Pyre type checker
 
 # pytype static type analyzer
