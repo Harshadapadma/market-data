@@ -141,6 +141,18 @@ def fetch_constituent_list(universe_name: str, max_age_hours: int = 168) -> list
             )
             return syms
 
+    # ── Last resort: bundled seed file (works on Streamlit Cloud / fresh deploys) ──
+    _seed = _ROOT / "data" / "seed" / f"{slug}_constituents.csv"
+    if _seed.exists():
+        syms = pd.read_csv(_seed)["symbol"].tolist()
+        if syms:
+            log.warning(
+                "Using bundled seed constituent list for %s (%d symbols). "
+                "NSE unreachable and no local cache.",
+                universe_name, len(syms),
+            )
+            return syms
+
     log.error("No constituent data at all for %s", universe_name)
     return []
 
