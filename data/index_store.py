@@ -24,6 +24,40 @@ import yfinance as yf
 
 log = logging.getLogger(__name__)
 
+# ── NSE archive name → yfinance ticker (for fallback) ─────────────────────────
+# When NSE archives have data, use it.  For indices with no NSE archive entry
+# (S&P 500, Gold, etc.) we use only yfinance.
+_NSE_NAME_TO_TICKER = {
+    "Nifty 50":           "^NSEI",
+    "Nifty Bank":         "^NSEBANK",
+    "Nifty Midcap 100":   "^NSMIDCP",
+    "Nifty Smallcap 100": "^CNXSMALL",
+    "Nifty IT":           "^CNXIT",
+    "Nifty Pharma":       "^CNXPHARMA",
+    "Nifty Auto":         "^CNXAUTO",
+    "Nifty FMCG":         "^CNXFMCG",
+    "Nifty Metal":        "^CNXMETAL",
+    "Nifty Energy":       "^CNXENERGY",
+    "Nifty Realty":       "^CNXREALTY",
+    "Nifty Next 50":      "^NSMIDCP",   # proxy (same ticker as Midcap 100)
+}
+
+# Explicit reverse: yfinance ticker → NSE archive name to request
+# Note: ^NSMIDCP maps to "Nifty Midcap 100" (primary), not "Nifty Next 50" (proxy).
+_TICKER_TO_NSE_NAME: dict[str, str] = {
+    "^NSEI":      "Nifty 50",
+    "^NSEBANK":   "Nifty Bank",
+    "^NSMIDCP":   "Nifty Midcap 100",   # ← correct: Midcap 100, not Next 50
+    "^CNXSMALL":  "Nifty Smallcap 100",
+    "^CNXIT":     "Nifty IT",
+    "^CNXPHARMA": "Nifty Pharma",
+    "^CNXAUTO":   "Nifty Auto",
+    "^CNXFMCG":   "Nifty FMCG",
+    "^CNXMETAL":  "Nifty Metal",
+    "^CNXENERGY": "Nifty Energy",
+    "^CNXREALTY": "Nifty Realty",
+}
+
 # ── Storage ───────────────────────────────────────────────────────────────────
 _ROOT      = Path(__file__).resolve().parent.parent
 _IDX_DIR   = _ROOT / "data" / "live" / "indices"
@@ -33,30 +67,31 @@ _IDX_DIR.mkdir(parents=True, exist_ok=True)
 # (display_name, yfinance_ticker, min_start_date)
 # min_start_date: ignore data before this date (avoids ETF-launch extreme returns)
 _INSTRUMENT_DEFS: list[tuple[str, str, str]] = [
-    # ── Broad Indian indices (full history, no min_start needed) ─────────────
+    # ── Broad Indian indices — sourced from NSE archives ──────────────────────
+    # Archives start from ~2011; yfinance fills pre-2011 where available.
+    # min_start_date: ignore data before this (ETF launch / sparse data)
     ("Nifty 50",              "^NSEI",        "2006-01-01"),
     ("Nifty 500",             "NIFTY500_SEED","2015-04-01"),  # from user Excel seed
-    ("Sensex",                "^BSESN",       "2006-01-01"),
+    ("Sensex",                "^BSESN",       "2006-01-01"),  # yfinance only (not on NSE archive)
     ("Nifty Bank",            "^NSEBANK",     "2006-01-01"),
     ("Nifty Midcap 100",      "^NSMIDCP",     "2006-01-01"),
-    ("Nifty Smallcap 100",    "^CNXSMALL",    "2010-01-01"),
+    ("Nifty Smallcap 100",    "^CNXSMALL",    "2011-01-03"),  # NSE archive from 2011
     ("Nifty Next 50",         "^NSMIDCP",     "2006-01-01"),  # proxy via midcap
-    # ── Sectoral indices ─────────────────────────────────────────────────────
+    # ── Sectoral indices — all sourced from NSE archives ─────────────────────
     ("Nifty IT",              "^CNXIT",       "2006-01-01"),
     ("Nifty Pharma",          "^CNXPHARMA",   "2006-01-01"),
-    ("Nifty Auto",            "^CNXAUTO",     "2010-01-01"),
-    ("Nifty FMCG",            "^CNXFMCG",     "2010-01-01"),
-    ("Nifty Metal",           "^CNXMETAL",    "2010-01-01"),
-    ("Nifty Energy",          "^CNXENERGY",   "2010-01-01"),
-    ("Nifty Realty",          "^CNXREALTY",   "2010-01-01"),
-    # ── ETFs (NSE listed) ─────────────────────────────────────────────────────
+    ("Nifty Auto",            "^CNXAUTO",     "2011-01-03"),
+    ("Nifty FMCG",            "^CNXFMCG",     "2011-01-03"),
+    ("Nifty Metal",           "^CNXMETAL",    "2011-01-03"),
+    ("Nifty Energy",          "^CNXENERGY",   "2011-01-03"),
+    ("Nifty Realty",          "^CNXREALTY",   "2011-01-03"),
+    # ── ETFs (NSE listed) — yfinance only ────────────────────────────────────
     # Gold BeES: listed March 2007. Spike correction handles the 2021 100:1 consolidation.
-    # Returns are clipped to ±300% in the spread page so launch-period extremes are bounded.
     ("Gold BeES (Nippon)",    "GOLDBEES.NS",  "2007-04-01"),
     ("Nifty BeES (Nippon)",   "NIFTYBEES.NS", "2006-01-01"),
     ("Junior BeES (NNext50)", "JUNIORBEES.NS","2006-01-01"),
     ("Bank BeES (Nippon)",    "BANKBEES.NS",  "2010-01-01"),
-    # ── Global / Commodities ─────────────────────────────────────────────────
+    # ── Global / Commodities — yfinance only ─────────────────────────────────
     ("USD/INR",               "USDINR=X",     "2006-01-01"),
     ("Gold (USD – Futures)",  "GC=F",         "2006-01-01"),
     ("Crude Oil (WTI)",       "CL=F",         "2006-01-01"),
@@ -190,6 +225,30 @@ def _fetch_nsei_from_existing_cache() -> pd.Series:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+def _fetch_from_nse_archive(
+    nse_name: str,
+    start_date: str,
+    end_date_excl: str,
+) -> pd.Series:
+    """
+    Fetch prices for a single NSE index by name from NSE archives.
+    Uses the same parallel archive downloader as the PE fetcher.
+    Returns an empty Series on failure.
+    """
+    try:
+        from data.fetcher import fetch_nse_index_bulk
+        series_dict, _ = fetch_nse_index_bulk(
+            start_date=start_date,
+            end_date=end_date_excl,
+        )
+        s = series_dict.get(nse_name, pd.Series(dtype=float))
+        s.name = nse_name
+        return s
+    except Exception as exc:
+        log.warning("NSE archive fetch for '%s' failed: %s", nse_name, exc)
+        return pd.Series(dtype=float)
+
+
 def get_price(
     ticker: str,
     start_date: str = "2006-01-01",
@@ -198,19 +257,19 @@ def get_price(
     """
     Return (price_series, status_dict) for *ticker* from *start_date* to today.
 
-    Behaviour
-    ---------
-    1.  Load cached CSV (if exists and not force_refresh).
-    2.  Determine missing tail (yesterday → latest cached).
-    3.  Fetch missing chunk from yfinance and append.
-    4.  Return combined series, trimmed to start_date.
+    For Indian NSE indices, the strategy is:
+      1. Load cached CSV (fast path — always checked first)
+      2. If cache is missing or has gaps: fetch from NSE archives (same source
+         as PE history — reliable, gapless, no auth required)
+      3. For non-Indian instruments (S&P 500, Gold, USDINR etc.): use yfinance
+
+    For all tickers the incremental update logic only fetches what's missing.
     """
     path = _csv_path(ticker)
     today = date.today()
     status: dict = {"ticker": ticker, "source": "cache", "success": True, "message": ""}
 
-    # ── Step 0: SEED-only tickers (no yfinance fetch) ────────────────────────
-    # These come entirely from locally seeded CSV files (e.g. from user's Excel).
+    # ── Step 0: SEED-only tickers ────────────────────────────────────────────
     if ticker == "NIFTY500_SEED":
         s = _load_csv(path)
         if s.empty:
@@ -222,8 +281,6 @@ def get_price(
         return s, status
 
     # ── Step 1: for ^NSEI, seed from the existing app cache ──────────────────
-    # data/fetcher.py already manages nifty_close.csv; reuse it to avoid
-    # a redundant full download on first run.
     if ticker == "^NSEI" and not path.exists() and not force_refresh:
         existing = _fetch_nsei_from_existing_cache()
         if not existing.empty:
@@ -232,45 +289,95 @@ def get_price(
     # ── Step 2: load cache ────────────────────────────────────────────────────
     cached = pd.Series(dtype=float) if force_refresh else _load_csv(path)
 
+    # Detect if this ticker has an NSE archive source
+    nse_name = _TICKER_TO_NSE_NAME.get(ticker)
+    use_nse  = nse_name is not None
+
     # ── Step 3: determine what (if anything) to fetch ────────────────────────
     fetch_end = str(today + timedelta(days=1))
-    pieces: list[pd.Series] = []   # new data chunks to merge
+    pieces: list[pd.Series] = []
 
     if cached.empty:
-        # Full download from start_date
-        new = _fetch_yfinance(ticker, start_date, fetch_end)
-        if not new.empty:
-            pieces.append(new)
-        status["source"] = "yfinance (full)"
+        if use_nse:
+            # Full download from NSE archives (more complete than yfinance)
+            nse_start = max(start_date, "2011-01-03")   # archives start ~2011
+            new_nse = _fetch_from_nse_archive(nse_name, nse_start, str(today))
+            if not new_nse.empty:
+                pieces.append(new_nse)
+                status["source"] = "NSE archives (full)"
+            # For dates before 2011, try yfinance as supplement
+            if date.fromisoformat(start_date) < date(2011, 1, 3):
+                yf_end = "2011-01-04"
+                old = _fetch_yfinance(ticker, start_date, yf_end)
+                if not old.empty:
+                    pieces.append(old)
+                    status["source"] = "NSE archives + yfinance (pre-2011)"
+        else:
+            new = _fetch_yfinance(ticker, start_date, fetch_end)
+            if not new.empty:
+                pieces.append(new)
+            status["source"] = "yfinance (full)"
     else:
         first_cached = cached.index[0].date()
         last_cached  = cached.index[-1].date()
+        req_start    = date.fromisoformat(start_date)
 
-        # ── Backfill: cache starts later than requested start_date ────────────
-        req_start = date.fromisoformat(start_date)
+        # ── Backfill: cache doesn't go back far enough ────────────────────────
         if first_cached > req_start + timedelta(days=30):
-            back_end = str(first_cached)
-            back = _fetch_yfinance(ticker, start_date, back_end)
-            if not back.empty:
-                pieces.append(back)
-                status["source"] = "yfinance (backfill+incremental)"
+            if use_nse:
+                nse_start = max(start_date, "2011-01-03")
+                back = _fetch_from_nse_archive(nse_name, nse_start, str(first_cached))
+                if not back.empty:
+                    pieces.append(back)
+                    status["source"] = "NSE archives (backfill)"
+            else:
+                back = _fetch_yfinance(ticker, start_date, str(first_cached))
+                if not back.empty:
+                    pieces.append(back)
+                    status["source"] = "yfinance (backfill+incremental)"
 
         # ── Forward-fill: cache doesn't reach today ───────────────────────────
         if last_cached < today - timedelta(days=1):
-            fwd = _fetch_yfinance(ticker, str(last_cached + timedelta(days=1)), fetch_end)
-            if not fwd.empty:
-                pieces.append(fwd)
-                if "source" not in status or status["source"] == "cache":
-                    status["source"] = "yfinance (incremental)"
+            fwd_start = str(last_cached + timedelta(days=1))
+            if use_nse:
+                fwd = _fetch_from_nse_archive(nse_name, fwd_start, str(today))
+                if not fwd.empty:
+                    pieces.append(fwd)
+                    if status["source"] == "cache":
+                        status["source"] = "NSE archives (incremental)"
+            else:
+                fwd = _fetch_yfinance(ticker, fwd_start, fetch_end)
+                if not fwd.empty:
+                    pieces.append(fwd)
+                    if status["source"] == "cache":
+                        status["source"] = "yfinance (incremental)"
         else:
-            if not pieces:   # nothing new at all
+            if not pieces:
                 status["message"] = f"Cached {len(cached)} rows up to {last_cached}"
+
+        # ── Gap-fill: detect and fill holes in NSE-sourced data ───────────────
+        # The old ^NSMIDCP yfinance data had a 403-day gap. Patch it.
+        if use_nse and not cached.empty and len(pieces) == 0:
+            diffs = cached.index.to_series().diff().dt.days
+            big_gaps = diffs[diffs > 20]
+            if not big_gaps.empty:
+                for gap_end_ts in big_gaps.index:
+                    gap_start_ts = cached.index[cached.index < gap_end_ts][-1]
+                    gap_s = str(gap_start_ts.date() + timedelta(days=1))
+                    gap_e = str(gap_end_ts.date())
+                    log.info("Filling %d-day gap in %s: %s → %s",
+                             int(big_gaps.loc[gap_end_ts]), ticker, gap_s, gap_e)
+                    fill = _fetch_from_nse_archive(nse_name, gap_s, gap_e)
+                    if not fill.empty:
+                        pieces.append(fill)
+                        status["source"] = "NSE archives (gap-fill)"
 
     # ── Combine ───────────────────────────────────────────────────────────────
     if pieces:
         combined = pd.concat([cached] + pieces).sort_index()
         combined = combined[~combined.index.duplicated(keep="last")]
-        combined = _fix_consolidation_spikes(combined)
+        if not use_nse:
+            combined = _fix_consolidation_spikes(combined)
         _save_csv(combined, path)
         status["message"] = (
             f"Cached {len(combined)} rows "
@@ -280,7 +387,7 @@ def get_price(
         combined = cached
         if combined.empty:
             status["success"] = False
-            status["message"] = f"No data available for {ticker} — check ticker or internet"
+            status["message"] = f"No data available for {ticker}"
         else:
             last_d   = combined.index[-1].date()
             lag      = (today - last_d).days

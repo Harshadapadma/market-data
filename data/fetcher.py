@@ -913,3 +913,172 @@ def fetch_pe_history(start_date: str = "2006-01-01") -> tuple[pd.Series, dict]:
         "has_seed": has_seed,
         "message":  f"✅ {src} | {n_real} real rows | {d0} → {d1}",
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  NSE INDEX PRICE BULK FETCHER
+#  Reuses the same NSE archives (ind_close_all_DDMMYYYY.csv) to get daily
+#  closing prices for ALL NSE indices — same source as PE history.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# NSE archive name → canonical display name used in index_store.py
+NSE_ARCHIVE_INDICES = {
+    "Nifty 50":              "Nifty 50",
+    "Nifty Bank":            "Nifty Bank",
+    "Nifty Midcap 100":      "Nifty Midcap 100",
+    "Nifty Smallcap 100":    "Nifty Smallcap 100",
+    "Nifty IT":              "Nifty IT",
+    "Nifty Pharma":          "Nifty Pharma",
+    "Nifty Auto":            "Nifty Auto",
+    "Nifty FMCG":            "Nifty FMCG",
+    "Nifty Metal":           "Nifty Metal",
+    "Nifty Energy":          "Nifty Energy",
+    "Nifty Realty":          "Nifty Realty",
+    "Nifty Next 50":         "Nifty Next 50",
+    "Nifty 500":             "Nifty 500",
+    "Nifty Smallcap 250":    "Nifty Smallcap 250",
+    "Nifty Midsmallcap 400": "Nifty Midsmallcap 400",
+    "Nifty100 Low Volatility 30": "Nifty100 LV 30",
+    "Nifty PSU Bank":        "Nifty PSU Bank",
+    "Nifty Private Bank":    "Nifty Private Bank",
+    "Nifty Financial Services": "Nifty Financial Services",
+    "Nifty Consumer Durables": "Nifty Consumer Durables",
+    "Nifty Healthcare Index": "Nifty Healthcare",
+}
+
+
+def _parse_archive_prices(text: str) -> dict[str, float]:
+    """
+    Parse one NSE archive CSV row and return {index_name: closing_value}.
+    The CSV has columns: Index Name, Closing Index Value, ...
+    Returns only indices that are in NSE_ARCHIVE_INDICES.
+    """
+    results: dict[str, float] = {}
+    if "Closing Index Value" not in text and "Index Name" not in text:
+        return results
+    try:
+        df = pd.read_csv(io.StringIO(text))
+        # Normalise column names
+        df.columns = [c.strip() for c in df.columns]
+        if "Index Name" not in df.columns or "Closing Index Value" not in df.columns:
+            return results
+        for _, row in df.iterrows():
+            name = str(row["Index Name"]).strip()
+            if name in NSE_ARCHIVE_INDICES:
+                try:
+                    val = float(str(row["Closing Index Value"]).replace(",", ""))
+                    if val > 0:
+                        results[name] = val
+                except (ValueError, TypeError):
+                    pass
+    except Exception:
+        pass
+    return results
+
+
+def _archive_one_day_prices(d: date) -> tuple[date, dict[str, float]] | None:
+    """
+    Fetch NSE archive CSV for one day and return (date, {index_name: price}).
+    Returns None if fetch fails or file has no index data.
+    """
+    url = (
+        f"https://archives.nseindia.com/content/indices/"
+        f"ind_close_all_{d.strftime('%d%m%Y')}.csv"
+    )
+    hdrs = {
+        "User-Agent": _S.headers["User-Agent"],
+        "Referer":    "https://archives.nseindia.com/",
+    }
+
+    # Attempt 1: plain requests
+    try:
+        r = requests.get(url, headers=hdrs, timeout=8)
+        if r.status_code == 200:
+            prices = _parse_archive_prices(r.text)
+            if prices:
+                return (d, prices)
+    except Exception:
+        pass
+
+    # Attempt 2: curl_cffi (Chrome TLS fingerprint)
+    try:
+        from curl_cffi import requests as cfr  # type: ignore
+        r2 = cfr.get(url, headers=hdrs, impersonate="chrome", timeout=8)
+        if r2.status_code == 200:
+            prices = _parse_archive_prices(r2.text)
+            if prices:
+                return (d, prices)
+    except Exception:
+        pass
+
+    return None
+
+
+def fetch_nse_index_bulk(
+    start_date: str = "2011-01-03",
+    end_date: str | None = None,
+    max_workers: int = 20,
+) -> tuple[dict[str, pd.Series], dict]:
+    """
+    Fetch daily closing prices for ALL NSE indices from NSE archives.
+
+    Returns
+    -------
+    (index_series_dict, status)
+        index_series_dict : {index_name: pd.Series(date → close)}
+        status            : {"rows": N, "message": "..."}
+
+    Archive coverage: typically from 2011 onwards (some indices from 2004).
+    For dates before NSE archive availability, yfinance is used as fallback.
+    """
+    today    = date.today()
+    end      = date.fromisoformat(end_date) if end_date else today
+    start    = date.fromisoformat(start_date)
+
+    # Generate all weekdays in range
+    all_days = [
+        start + timedelta(days=i)
+        for i in range((end - start).days + 1)
+        if (start + timedelta(days=i)).weekday() < 5
+    ]
+
+    logger.info("fetch_nse_index_bulk: fetching %d weekdays from %s → %s", len(all_days), start, end)
+
+    # Parallel fetch
+    day_data: dict[date, dict[str, float]] = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(_archive_one_day_prices, d): d for d in all_days}
+        for f in as_completed(futures):
+            result = f.result()
+            if result is not None:
+                d, prices = result
+                day_data[d] = prices
+
+    if not day_data:
+        return {}, {"rows": 0, "message": "⚠️ NSE archive: no data fetched"}
+
+    # Build per-index series
+    index_series: dict[str, dict[date, float]] = {}
+    for d, prices in sorted(day_data.items()):
+        for name, val in prices.items():
+            index_series.setdefault(name, {})[d] = val
+
+    result_dict: dict[str, pd.Series] = {}
+    for name, data in index_series.items():
+        s = pd.Series(
+            {pd.Timestamp(k): v for k, v in sorted(data.items())},
+            name=name,
+        )
+        result_dict[name] = s
+
+    total_rows = sum(len(s) for s in result_dict.values())
+    d0 = min(day_data.keys())
+    d1 = max(day_data.keys())
+    logger.info("fetch_nse_index_bulk: got %d indices, %d total rows (%s → %s)",
+                len(result_dict), total_rows, d0, d1)
+
+    return result_dict, {
+        "rows":    len(day_data),
+        "indices": len(result_dict),
+        "message": f"✅ NSE archives | {len(day_data)} days | {d0} → {d1}",
+    }

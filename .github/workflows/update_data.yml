@@ -36,12 +36,17 @@ jobs:
       - name: Run data update script
         run: python scripts/update_live_data.py
 
+      - name: Update index price cache
+        run: python scripts/cache_all_indices.py
+        # Fetches today's NSE archive for all Indian index prices
+        # and incremental yfinance for ETFs / global indices
+
       - name: Commit and push updated files
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Stage live data + stock price cache (so Streamlit Cloud deploys with full cache)
+          # Stage live data + stock price cache + index price CSVs
           git add data/live/
           git add cache/
 
