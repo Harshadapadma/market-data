@@ -98,39 +98,19 @@ def plot_breadth_time_series(
 
     fig = go.Figure()
 
-    # ── Background fill bands ─────────────────────────────────────────────────
-    fig.add_trace(go.Scatter(
-        x=pct.index, y=pct.clip(lower=mean),
-        fill="tozeroy", fillcolor="rgba(63,185,80,0.07)",
-        line=dict(width=0), showlegend=False, hoverinfo="skip",
-    ))
-    fig.add_trace(go.Scatter(
-        x=pct.index, y=pct.clip(upper=mean),
-        fill="tozeroy", fillcolor="rgba(248,81,73,0.07)",
-        line=dict(width=0), showlegend=False, hoverinfo="skip",
-    ))
-
-    # ── Colored line segments (visual only) ───────────────────────────────────
-    colors = [_GREEN if v >= mean else _RED for v in pct]
-    for i in range(len(pct) - 1):
-        fig.add_trace(go.Scatter(
-            x=pct.index[i : i + 2], y=pct.iloc[i : i + 2],
-            mode="lines", line=dict(color=colors[i], width=1.5),
-            showlegend=False, hoverinfo="skip",
-        ))
-
-    # ── Invisible markers at every point — this is what makes hover snap to each day
+    # ── Single line — color based on latest value vs mean ────────────────────
+    line_color = _GREEN if float(pct.iloc[-1]) >= mean else _RED
     fig.add_trace(go.Scatter(
         x=pct.index, y=pct,
-        mode="markers",
+        mode="lines",
         name="% beating benchmark",
-        marker=dict(size=8, color="rgba(0,0,0,0)"),
+        line=dict(color=line_color, width=1.8),
         customdata=df[["count_eligible", "benchmark_return"]].values,
         hovertemplate=(
             "<b>%{x|%d %b %Y}</b><br>"
             "%{y:.1f}% of stocks beat benchmark<br>"
             "Benchmark return: %{customdata[1]:.1f}%<br>"
-            "Eligible stocks: %{customdata[0]}<extra></extra>"
+            "Eligible stocks: %{customdata[0]:.0f}<extra></extra>"
         ),
     ))
 
