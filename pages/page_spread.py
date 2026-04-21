@@ -350,23 +350,10 @@ def plot_rolling_returns(
 # ── Main page render ───────────────────────────────────────────────────────────
 
 def render() -> None:
-    # ── Page header ───────────────────────────────────────────────────────────
+    # ── Sub-header ────────────────────────────────────────────────────────────
     st.markdown(
-        """
-        <style>
-        .pg-header { display:flex; flex-wrap:wrap; align-items:baseline;
-                     gap:8px; margin-bottom:8px; padding-left:2px; overflow:visible; }
-        .pg-title  { font-size:clamp(18px,4vw,26px); font-weight:700;
-                     color:#58A6FF; font-family:IBM Plex Mono,monospace;
-                     letter-spacing:1px; white-space:nowrap; }
-        .pg-sub    { font-size:clamp(11px,2vw,13px); color:#8B949E;
-                     font-family:IBM Plex Mono,monospace; }
-        </style>
-        <div class='pg-header'>
-            <span class='pg-title'>⇄ RETURN SPREAD</span>
-            <span class='pg-sub'>Any two instruments &nbsp;·&nbsp; Rolling return diff with Avg / ±1σ / ±2σ bands</span>
-        </div>
-        """,
+        "<div style='font-size:12px;color:#8B949E;font-family:IBM Plex Mono,monospace;"
+        "margin-bottom:10px'>Any two instruments · rolling return diff with Avg / ±1σ / ±2σ bands</div>",
         unsafe_allow_html=True,
     )
 
@@ -477,21 +464,21 @@ def render() -> None:
     delta = last - mean
     pct   = stats["pct"]
 
-    m1, m2, m3, m4, m5 = st.columns(5)
+    m1, m2, m3, m4, m5 = st.columns([1, 1, 1, 1, 1])
     with m1:
-        st.metric("Current Spread", f"{last:+.2f}%",
+        st.metric("Spread Now", f"{last:+.2f}%",
                   help=f"Latest rolling {wlabel} return: {name_a} − {name_b}")
     with m2:
-        st.metric("Avg Diff (full hist)", f"{mean:+.2f}%",
+        st.metric("Avg (full hist)", f"{mean:+.2f}%",
                   help=f"Full-history average ({eff_start} → today)")
     with m3:
-        st.metric("Std Dev (σ)", f"{std:.2f}%",
-                  delta=f"Z-score: {z:+.2f}", delta_color="off")
+        st.metric("Std Dev σ", f"{std:.2f}%",
+                  delta=f"Z: {z:+.2f}", delta_color="off")
     with m4:
-        st.metric("vs Average", f"{delta:+.2f}%",
+        st.metric("vs Avg", f"{delta:+.2f}%",
                   delta_color="normal")
     with m5:
-        st.metric("Percentile", f"{pct:.0f}th",
+        st.metric("Pctile", f"{pct:.0f}th",
                   help="% of historical readings below the current spread")
 
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
