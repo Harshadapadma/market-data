@@ -642,9 +642,6 @@ def _render_results(
         f"<div style='margin-top:16px;padding:10px 16px;border:1px solid {_BORDER};"
         f"border-left:3px solid {_YELLOW};border-radius:6px;"
         f"font-family:{_FONT};font-size:10px;color:{_GREY}'>"
-        f"Survivorship bias note: This analysis uses the current {universe_name} "
-        f"constituent list applied to all historical dates. Results are indicative, "
-        f"not investment advice."
         f"</div>",
         unsafe_allow_html=True,
     )
