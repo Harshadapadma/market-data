@@ -124,7 +124,8 @@ def plot_breadth_time_series(
         x=pct.index, y=pct,
         mode="lines",
         name="% beating benchmark",
-        line=dict(color="rgba(0,0,0,0)", width=8),   # wide transparent hitbox
+        line=dict(color="#ffffff", width=8),
+        opacity=0,   # opacity=0 keeps hover detection; rgba transparent does not
         customdata=df[["count_eligible", "benchmark_return"]].values,
         hovertemplate=(
             "<b>%{x|%d %b %Y}</b><br>"

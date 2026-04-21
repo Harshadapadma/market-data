@@ -40,15 +40,21 @@ st.markdown(
         color: #E6EDF3;
     }
     .stApp { background-color: #0D1117; }
+
+    /* Keep header visible — it contains the sidebar toggle button */
     header[data-testid="stHeader"] {
         background-color: #0D1117;
         border-bottom: 1px solid #21262D;
     }
+
     section[data-testid="stSidebar"] {
         background-color: #0D1117;
         border-right: 1px solid #21262D;
     }
     [data-testid="stSidebarNav"] { display: none !important; }
+    /* Always show sidebar collapse/expand toggle */
+    [data-testid="collapsedControl"],
+    button[kind="header"] { display: flex !important; visibility: visible !important; }
 
     /* ── Metric cards ───────────────────────────────────────────────────── */
     div[data-testid="stMetric"] {
@@ -85,11 +91,6 @@ st.markdown(
         padding-bottom: 2rem;
         max-width: 100% !important;
     }
-    header[data-testid="stHeader"] {
-        height: 0 !important;
-        min-height: 0 !important;
-        visibility: hidden !important;
-    }
 
     /* ── Page header titles ──────────────────────────────────────────────── */
     .pg-header {
@@ -119,17 +120,6 @@ st.markdown(
 
     /* ── Mobile ──────────────────────────────────────────────────────────── */
     @media screen and (max-width: 768px) {
-        section[data-testid="stSidebar"] {
-            width: 0 !important;
-            min-width: 0 !important;
-        }
-        .appview-container .main {
-            margin-left: 0 !important;
-            padding-left: 0 !important;
-        }
-        .appview-container {
-            flex-direction: column !important;
-        }
         .block-container {
             padding-left: 0.75rem !important;
             padding-right: 0.75rem !important;
