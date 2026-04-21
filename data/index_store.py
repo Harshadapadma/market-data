@@ -421,7 +421,7 @@ def get_price(
                     status["source"] = "yfinance (backfill+incremental)"
 
         # ── Forward-fill: cache doesn't reach today ───────────────────────────
-        if last_cached < today - timedelta(days=1):
+        if last_cached < today:
             fwd_start = str(last_cached + timedelta(days=1))
             if use_nse:
                 fwd = _fetch_from_nse_archive(nse_name, fwd_start, str(today))
