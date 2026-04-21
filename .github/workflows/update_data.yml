@@ -4,7 +4,7 @@ on:
   schedule:
     # 5:30 PM IST = 12:00 UTC  (NSE archives usually published by 5pm IST)
     # Runs Mon–Fri only
-    - cron: '0 12 * * 1-5'
+    - cron: '0 */3 * * *'
 
   # Also allow manual trigger from GitHub Actions tab
   workflow_dispatch:
