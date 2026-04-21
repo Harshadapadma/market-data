@@ -33,36 +33,8 @@ _PURP  = "#D2A8FF"
 _CYAN  = "#00CED1"
 _FONT  = "IBM Plex Mono, monospace"
 
-_H          = 460
-DATA_START  = "2006-01-01"
-
-# ── Preset pairs ──────────────────────────────────────────────────────────────
-# (label shown in dropdown, ticker_A, name_A, ticker_B, name_B)
-_PRESET_PAIRS: list[tuple[str, str, str, str, str]] = [
-    # ── Segment spreads vs Nifty 50 ──────────────────────────────────────────
-    ("Nifty Smallcap 100 − Nifty 50",  "^CNXSMALL",  "Nifty Smallcap 100", "^NSEI",       "Nifty 50"),
-    ("Nifty Midcap 100 − Nifty 50",    "^NSMIDCP",   "Nifty Midcap 100",   "^NSEI",       "Nifty 50"),
-    ("Nifty Bank − Nifty 50",          "^NSEBANK",   "Nifty Bank",         "^NSEI",       "Nifty 50"),
-    ("Nifty IT − Nifty 50",            "^CNXIT",     "Nifty IT",           "^NSEI",       "Nifty 50"),
-    ("Nifty Pharma − Nifty 50",        "^CNXPHARMA", "Nifty Pharma",       "^NSEI",       "Nifty 50"),
-    ("Nifty Auto − Nifty 50",          "^CNXAUTO",   "Nifty Auto",         "^NSEI",       "Nifty 50"),
-    ("Nifty FMCG − Nifty 50",         "^CNXFMCG",   "Nifty FMCG",         "^NSEI",       "Nifty 50"),
-    ("Nifty Metal − Nifty 50",         "^CNXMETAL",  "Nifty Metal",        "^NSEI",       "Nifty 50"),
-    ("Nifty Energy − Nifty 50",        "^CNXENERGY", "Nifty Energy",       "^NSEI",       "Nifty 50"),
-    ("Nifty Realty − Nifty 50",        "^CNXREALTY", "Nifty Realty",       "^NSEI",       "Nifty 50"),
-    # ── Nifty 50 vs alternatives ─────────────────────────────────────────────
-    ("Nifty 50 − Gold BeES",           "^NSEI",      "Nifty 50",           "GOLDBEES.NS", "Gold BeES (Nippon)"),
-    ("Nifty 50 − S&P 500",             "^NSEI",      "Nifty 50",           "^GSPC",       "S&P 500"),
-    ("Nifty 50 − Crude Oil (WTI)",     "^NSEI",      "Nifty 50",           "CL=F",        "Crude Oil (WTI)"),
-    # ── Segment spreads within mid/small ─────────────────────────────────────
-    ("Nifty Smallcap 100 − Midcap 100","^CNXSMALL",  "Nifty Smallcap 100", "^NSMIDCP",    "Nifty Midcap 100"),
-    ("Nifty Bank − Nifty IT",          "^NSEBANK",   "Nifty Bank",         "^CNXIT",      "Nifty IT"),
-    # ── Custom ────────────────────────────────────────────────────────────────
-    ("⚙ Custom (pick any two)",        "",           "",                   "",            ""),
-]
-
-_PRESET_LABELS = [p[0] for p in _PRESET_PAIRS]
-_PRESET_MAP    = {p[0]: p for p in _PRESET_PAIRS}
+_H         = 460
+DATA_START = "2006-01-01"
 
 
 # ── Date filter ────────────────────────────────────────────────────────────────
@@ -84,7 +56,7 @@ def _date_filter() -> tuple[date, date]:
     chosen = st.radio(
         "Date range",
         list(presets.keys()),
-        index=8,  # default: Max
+        index=8,
         horizontal=True,
         key="spread_preset",
         label_visibility="collapsed",
@@ -120,28 +92,13 @@ def _null_gap_boundaries(
     max_cal_gap: int = 10,
     max_single_day_chg: float = 0.30,
 ) -> pd.Series:
-    """
-    Set the price to NaN on days that carry a data-stitching artefact:
-
-    1. Calendar-gap > max_cal_gap days (e.g. the 256-day hole in ^NSMIDCP).
-    2. Single-day price change > max_single_day_chg in absolute value
-       (e.g. yfinance joining Nifty Midcap 50 + Midcap 100 data = −33% on Nov 9 2015).
-
-    Without this, pct_change() across such boundaries looks like real giant moves
-    and blows up the rolling-return chart.
-    """
     if s.empty or len(s) < 2:
         return s
     s = s.copy().astype(float)
-
-    # 1. Calendar-gap boundaries
     cal_gaps = pd.Series(s.index, index=s.index).diff().dt.days
     bad_cal  = cal_gaps[cal_gaps > max_cal_gap].index
-
-    # 2. Huge single-day price jumps (index stitching artefacts)
     raw_chg  = s.pct_change(fill_method=None).abs()
     bad_chg  = raw_chg[raw_chg > max_single_day_chg].index
-
     bad_days = bad_cal.union(bad_chg)
     s.loc[bad_days] = float("nan")
     return s
@@ -167,19 +124,14 @@ def _compute_spread(
 
     ra = _rolling_return(s_a, window)
     rb = _rolling_return(s_b, window)
-
     spread = ra - rb
 
-    # ── Expose data gaps so Plotly draws a break, not a fake straight line ────
-    # Reindex to full calendar; forward-fill only weekends & short holidays
-    # (≤5 days). Any gap longer than that stays NaN → visible gap in chart.
     if not spread.empty:
         full_idx = pd.date_range(spread.index[0], spread.index[-1], freq="D")
         spread = spread.reindex(full_idx).ffill(limit=5)
         ra     = ra.reindex(full_idx).ffill(limit=5)
         rb     = rb.reindex(full_idx).ffill(limit=5)
 
-    # Drop leading/trailing NaN but keep interior NaN (they mark real gaps)
     first_valid = spread.first_valid_index()
     last_valid  = spread.last_valid_index()
     if first_valid and last_valid:
@@ -208,32 +160,32 @@ def _stats(spread: pd.Series) -> dict:
 # ── Charts ─────────────────────────────────────────────────────────────────────
 
 def _adaptive_xticks(span_years: float) -> tuple[str | int, str, int]:
-    """Return (dtick, tickformat, tickangle) that match the visible date range."""
-    if span_years <= (31 / 365.25):          # ≤ ~1 month → daily
-        return 86_400_000,     "%d %b",   45
-    elif span_years <= 0.5:                  # ≤ ~6 months → every 5 days
-        return 86_400_000 * 5, "%d %b",   45
-    elif span_years <= 5:                    # ≤ 5 years → monthly
-        return "M1",            "%b '%y",  45
-    else:                                    # > 5 years → yearly
-        return "M12",           "%Y",       0
+    if span_years <= (31 / 365.25):
+        return 86_400_000,     "%d %b",  45
+    elif span_years <= 0.5:
+        return 86_400_000 * 5, "%d %b",  45
+    elif span_years <= 5:
+        return "M1",           "%b '%y", 45
+    else:
+        return "M12",          "%Y",      0
 
 
-def _base_fig(title: str, right_margin: int = 180, span_years: float = 99) -> go.Figure:
+def _base_fig(title: str, right_margin: int = 160, span_years: float = 99) -> go.Figure:
     dtick, tickfmt, tickangle = _adaptive_xticks(span_years)
     fig = go.Figure()
     fig.update_layout(
-        title=dict(text=title, font=dict(size=14, color=_TEXT, family=_FONT), x=0.01),
+        title=dict(text=title, font=dict(size=13, color=_TEXT, family=_FONT), x=0.01),
         paper_bgcolor=_BG2,
         plot_bgcolor=_BG,
         font=dict(family=_FONT, color=_TEXT, size=11),
         height=_H,
         hovermode="x unified",
-        margin=dict(l=70, r=right_margin, t=60, b=60),
+        autosize=True,
+        margin=dict(l=50, r=right_margin, t=60, b=55, autoexpand=True),
         legend=dict(
             orientation="h", yanchor="bottom", y=1.02,
             xanchor="left", x=0,
-            bgcolor="rgba(0,0,0,0)", font=dict(size=11),
+            bgcolor="rgba(0,0,0,0)", font=dict(size=10),
         ),
         xaxis=dict(
             gridcolor=_GRID, linecolor=_GRID,
@@ -261,36 +213,33 @@ def plot_spread_with_bands(
     std  = stats["std"]
 
     sd_levels = [
-        (f"+2σ  ({mean + 2*std:+.2f}%)", mean + 2*std, _CYAN,  "dash"),
-        (f"+1σ  ({mean +   std:+.2f}%)", mean +   std, _GREEN, "dash"),
+        (f"+2s  ({mean + 2*std:+.2f}%)", mean + 2*std, _CYAN,  "dash"),
+        (f"+1s  ({mean +   std:+.2f}%)", mean +   std, _GREEN, "dash"),
         (f"Avg  ({mean:+.2f}%)",          mean,         _ORG,   "solid"),
-        (f"−1σ  ({mean -   std:+.2f}%)", mean -   std, _PURP,  "dash"),
-        (f"−2σ  ({mean - 2*std:+.2f}%)", mean - 2*std, _RED,   "dash"),
+        (f"-1s  ({mean -   std:+.2f}%)", mean -   std, _PURP,  "dash"),
+        (f"-2s  ({mean - 2*std:+.2f}%)", mean - 2*std, _RED,   "dash"),
     ]
 
     span_years = (spread.index[-1] - spread.index[0]).days / 365.25 if len(spread) >= 2 else 99
     fig = _base_fig(
-        f"Return Spread  ·  {name_a} − {name_b}  ({window_label})",
-        right_margin=200,
+        f"Return Spread  -  {name_a} vs {name_b}  ({window_label})",
+        right_margin=155,
         span_years=span_years,
     )
 
-    # SD horizontal lines + right-side labels
     for i, (label, level, colour, dash) in enumerate(sd_levels):
         fig.add_hline(y=level, line=dict(color=colour, width=1.5, dash=dash))
         fig.add_annotation(
-            x=1.02, xref="paper",
+            x=1.01, xref="paper",
             y=level, yref="y",
             text=label, showarrow=False,
-            font=dict(color=colour, size=10, family=_FONT),
+            font=dict(color=colour, size=9, family=_FONT),
             xanchor="left", align="left",
             yshift=i * 2,
         )
 
-    # Zero reference
     fig.add_hline(y=0, line=dict(color=_GREY, width=0.7, dash="dot"))
 
-    # MA20
     ma20 = spread.rolling(20).mean()
     fig.add_trace(go.Scatter(
         x=spread.index, y=ma20,
@@ -299,10 +248,9 @@ def plot_spread_with_bands(
         opacity=0.7,
     ))
 
-    # Main spread line
     fig.add_trace(go.Scatter(
         x=spread.index, y=spread,
-        name=f"{name_a} − {name_b}",
+        name=f"{name_a} vs {name_b}",
         mode="lines",
         line=dict(color=_BLUE, width=2),
         fill="tozeroy",
@@ -310,7 +258,6 @@ def plot_spread_with_bands(
         hovertemplate="%{y:.2f}%<extra>Spread</extra>",
     ))
 
-    # Current value dot
     fig.add_trace(go.Scatter(
         x=[spread.index[-1]], y=[spread.iloc[-1]],
         mode="markers",
@@ -329,8 +276,8 @@ def plot_rolling_returns(
 ) -> go.Figure:
     span_years = (ra.index[-1] - ra.index[0]).days / 365.25 if len(ra) >= 2 else 99
     fig = _base_fig(
-        f"Rolling {window_label} Return  ·  {name_a}  vs  {name_b}",
-        right_margin=40,
+        f"Rolling {window_label} Return  -  {name_a}  vs  {name_b}",
+        right_margin=20,
         span_years=span_years,
     )
     fig.add_trace(go.Scatter(
@@ -350,31 +297,27 @@ def plot_rolling_returns(
 # ── Main page render ───────────────────────────────────────────────────────────
 
 def render() -> None:
-    # ── Page header ───────────────────────────────────────────────────────────
     st.markdown(
-    """
-    <div class='pg-header'>
-        <span class='pg-title'>⇄ RETURN SPREAD</span>
-        <span class='pg-sub'>Any two instruments &nbsp;·&nbsp; Rolling return diff with Avg / ±1σ / ±2σ bands</span>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+        """
+        <div class='pg-header'>
+            <span class='pg-title'>&#8644; RETURN SPREAD</span>
+            <span class='pg-sub'>Any two instruments &nbsp;·&nbsp; Rolling return diff with Avg / ±1σ / ±2σ bands</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    # ── Pair selector — always custom ────────────────────────────────────────
     all_names = list(INSTRUMENTS.keys())
     cc1, cc2 = st.columns(2)
     with cc1:
         name_a = st.selectbox(
-            "Instrument A",
-            all_names,
+            "Instrument A", all_names,
             index=all_names.index("Nifty 50") if "Nifty 50" in all_names else 0,
             key="sp_custom_a",
         )
     with cc2:
         name_b = st.selectbox(
-            "Instrument B",
-            all_names,
+            "Instrument B", all_names,
             index=all_names.index("Gold BeES (Nippon)") if "Gold BeES (Nippon)" in all_names else 1,
             key="sp_custom_b",
         )
@@ -383,7 +326,6 @@ def render() -> None:
 
     st.divider()
 
-    # ── Window + date filter ─────────────────────────────────────────────────
     window_opts = {
         "1M  (21D)":  21,
         "3M  (63D)":  63,
@@ -392,35 +334,25 @@ def render() -> None:
         "2Y (504D)": 504,
     }
     wlabel = st.selectbox(
-        "Lookback period",
-        list(window_opts.keys()),
-        index=3,
-        key="sp_window",
+        "Lookback period", list(window_opts.keys()),
+        index=3, key="sp_window",
     )
     window = window_opts[wlabel]
 
     st.markdown("**📅 Date range**")
     date_from, date_to = _date_filter()
 
-    # ── Data fetch ────────────────────────────────────────────────────────────
-    with st.spinner(f"Loading {name_a} and {name_b}…"):
+    with st.spinner(f"Loading {name_a} and {name_b}..."):
         s_a_raw, status_a = get_price(ticker_a, start_date=DATA_START)
         s_b_raw, status_b = get_price(ticker_b, start_date=DATA_START)
 
     if s_a_raw.empty:
-        st.error(
-            f"❌ **{name_a}** — Could not fetch data.\n\n"
-            f"`{status_a['message']}`"
-        )
+        st.error(f"Could not fetch data for {name_a}.\n\n`{status_a['message']}`")
         return
     if s_b_raw.empty:
-        st.error(
-            f"❌ **{name_b}** — Could not fetch data.\n\n"
-            f"`{status_b['message']}`"
-        )
+        st.error(f"Could not fetch data for {name_b}.\n\n`{status_b['message']}`")
         return
 
-    # ── Compute spread (full history → accurate SD bands) ────────────────────
     ra_full, rb_full, spread_full = _compute_spread(
         s_a_raw, s_b_raw, ticker_a, ticker_b, window
     )
@@ -429,12 +361,11 @@ def render() -> None:
         st.error("Not enough overlapping history. Try a shorter rolling window.")
         return
 
-    stats    = _stats(spread_full)
+    stats     = _stats(spread_full)
     eff_start = spread_full.index[0].date()
 
-    # ── Apply date filter ─────────────────────────────────────────────────────
-    ts_from = pd.Timestamp(date_from)
-    ts_to   = pd.Timestamp(date_to)
+    ts_from     = pd.Timestamp(date_from)
+    ts_to       = pd.Timestamp(date_to)
     spread_view = spread_full[(spread_full.index >= ts_from) & (spread_full.index <= ts_to)]
     ra_view     = ra_full[(ra_full.index >= ts_from) & (ra_full.index <= ts_to)]
     rb_view     = rb_full[(rb_full.index >= ts_from) & (rb_full.index <= ts_to)]
@@ -443,53 +374,46 @@ def render() -> None:
         st.warning("No data for selected date range. Widen the filter.")
         return
 
-    # ── Metric cards (stats from FULL history) ────────────────────────────────
     last  = stats["last"]
     mean  = stats["mean"]
     std   = stats["std"]
     z     = (last - mean) / std if std > 0 else 0
     delta = last - mean
-    pct   = stats["pct"]
 
     m1, m2, m3, m4 = st.columns([1, 1, 1, 1])
     with m1:
-        st.metric("Spread Now", f"{last:+.2f}%",
-                  help=f"Latest rolling {wlabel} return: {name_a} − {name_b}")
+        st.metric("Spread Now", f"{last:+.2f}%")
     with m2:
-        st.metric("Avg (full hist)", f"{mean:+.2f}%",
-                  help=f"Full-history average ({eff_start} → today)")
+        st.metric("Avg (full hist)", f"{mean:+.2f}%")
     with m3:
-        st.metric("Std Dev σ", f"{std:.2f}%",
-                  delta=f"Z: {z:+.2f}", delta_color="off")
+        st.metric("Std Dev", f"{std:.2f}%", delta=f"Z: {z:+.2f}", delta_color="off")
     with m4:
-        st.metric("vs Avg", f"{delta:+.2f}%",
-                  delta_color="normal")
+        st.metric("vs Avg", f"{delta:+.2f}%", delta_color="normal")
 
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 
-    # ── Chart 1 (full width): Spread + SD bands ───────────────────────────────
     st.plotly_chart(
         plot_spread_with_bands(spread_view, stats, wlabel, name_a, name_b),
         use_container_width=True,
+        config={"responsive": True},
     )
 
-    # ── Chart 2 (full width): Individual rolling returns ──────────────────────
     st.plotly_chart(
         plot_rolling_returns(ra_view, rb_view, wlabel, name_a, name_b),
         use_container_width=True,
+        config={"responsive": True},
     )
 
-    # ── Raw data expander ─────────────────────────────────────────────────────
     with st.expander("📋 Raw data", expanded=False):
         raw_df = pd.DataFrame({
             f"{name_a} {wlabel} Return (%)": ra_view,
             f"{name_b} {wlabel} Return (%)": rb_view,
-            "Spread (A − B) (%)":            spread_view,
+            "Spread (A - B) (%)":            spread_view,
             "Avg (%)":                        mean,
-            "+2σ (%)":                        mean + 2*std,
-            "+1σ (%)":                        mean + std,
-            "−1σ (%)":                        mean - std,
-            "−2σ (%)":                        mean - 2*std,
+            "+2s (%)":                        mean + 2*std,
+            "+1s (%)":                        mean + std,
+            "-1s (%)":                        mean - std,
+            "-2s (%)":                        mean - 2*std,
         })
         raw_df.index = raw_df.index.date
         st.dataframe(
@@ -499,7 +423,7 @@ def render() -> None:
         safe_a = name_a.replace(" ", "_").replace("/", "-")
         safe_b = name_b.replace(" ", "_").replace("/", "-")
         st.download_button(
-            "⬇ Download CSV",
+            "Download CSV",
             data=raw_df.to_csv(),
             file_name=f"{safe_a}_vs_{safe_b}_spread.csv",
             mime="text/csv",
