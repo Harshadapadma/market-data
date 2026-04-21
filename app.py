@@ -41,8 +41,8 @@ st.markdown(
     }
     .stApp { background-color: #0D1117; }
     header[data-testid="stHeader"] {
-        background-color: #0D1117 !important;
-        border-bottom: 1px solid #21262D !important;
+        background-color: #0D1117;
+        border-bottom: 1px solid #21262D;
     }
     section[data-testid="stSidebar"] {
         background-color: #0D1117;
@@ -81,9 +81,14 @@ st.markdown(
     /* ── General layout ─────────────────────────────────────────────────── */
     .stAlert { border-radius: 8px; }
     .block-container {
-        padding-top: 1rem !important;
+        padding-top: 3.5rem !important;
         padding-bottom: 2rem;
         max-width: 100% !important;
+    }
+    header[data-testid="stHeader"] {
+        height: 0 !important;
+        min-height: 0 !important;
+        visibility: hidden !important;
     }
 
     /* ── Page header titles ──────────────────────────────────────────────── */
@@ -128,7 +133,7 @@ st.markdown(
         .block-container {
             padding-left: 0.75rem !important;
             padding-right: 0.75rem !important;
-            padding-top: 1rem !important;
+            padding-top: 3rem !important;
             max-width: 100vw !important;
             width: 100% !important;
         }
@@ -153,12 +158,6 @@ st.markdown(
         div[data-testid="stRadio"] > div {
             flex-wrap: wrap !important;
             gap: 4px !important;
-        }
-        /* Ensure sidebar hamburger toggle is always visible */
-        button[data-testid="collapsedControl"] {
-            display: flex !important;
-            visibility: visible !important;
-            opacity: 1 !important;
         }
     }
 
