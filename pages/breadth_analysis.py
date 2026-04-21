@@ -98,6 +98,7 @@ def plot_breadth_time_series(
 
     fig = go.Figure()
 
+    # ── Background fill bands ─────────────────────────────────────────────────
     fig.add_trace(go.Scatter(
         x=pct.index, y=pct.clip(lower=mean),
         fill="tozeroy", fillcolor="rgba(63,185,80,0.07)",
@@ -109,23 +110,14 @@ def plot_breadth_time_series(
         line=dict(width=0), showlegend=False, hoverinfo="skip",
     ))
 
-    colors = [_GREEN if v >= mean else _RED for v in pct]
-    for i in range(len(pct) - 1):
-        fig.add_trace(go.Scatter(
-            x=pct.index[i : i + 2],
-            y=pct.iloc[i : i + 2],
-            mode="lines",
-            line=dict(color=colors[i], width=1.5),
-            showlegend=False,
-            hoverinfo="skip",
-        ))
-
+    # ── Single line trace with per-point marker colors — hover works on every point
+    point_colors = [_GREEN if v >= mean else _RED for v in pct]
     fig.add_trace(go.Scatter(
         x=pct.index, y=pct,
-        mode="lines",
+        mode="lines+markers",
         name="% beating benchmark",
-        line=dict(color="#ffffff", width=8),
-        opacity=0,   # opacity=0 keeps hover detection; rgba transparent does not
+        line=dict(color=_RED, width=1.5),
+        marker=dict(color=point_colors, size=5, line=dict(width=0)),
         customdata=df[["count_eligible", "benchmark_return"]].values,
         hovertemplate=(
             "<b>%{x|%d %b %Y}</b><br>"
