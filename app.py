@@ -79,19 +79,19 @@ st.markdown(
     div[data-testid="stRadio"] label:hover { border-color: #58A6FF; }
 
     /* ── General layout ─────────────────────────────────────────────────── */
+    .stAlert { border-radius: 8px; }
     .block-container {
         padding-top: 3.5rem !important;
         padding-bottom: 2rem;
         max-width: 100% !important;
     }
-    /* Force Streamlit's top header bar to not clip content */
     header[data-testid="stHeader"] {
         height: 0 !important;
         min-height: 0 !important;
         visibility: hidden !important;
     }
 
-    /* ── Page header titles (fix clipping on all pages) ─────────────────── */
+    /* ── Page header titles ──────────────────────────────────────────────── */
     .pg-header {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -117,9 +117,8 @@ st.markdown(
         line-height: 1.4 !important;
     }
 
-/* ── Mobile ─────────────────────────────────────────────────────────── */
+    /* ── Mobile ──────────────────────────────────────────────────────────── */
     @media screen and (max-width: 768px) {
-        /* Kill sidebar ghost margin so charts get full width */
         section[data-testid="stSidebar"] {
             width: 0 !important;
             min-width: 0 !important;
@@ -128,7 +127,6 @@ st.markdown(
             margin-left: 0 !important;
             padding-left: 0 !important;
         }
-        /* Full-width main content area */
         .appview-container {
             flex-direction: column !important;
         }
@@ -139,7 +137,6 @@ st.markdown(
             max-width: 100vw !important;
             width: 100% !important;
         }
-        /* Charts fill viewport */
         .stPlotlyChart {
             width: 100% !important;
             max-width: 100vw !important;
@@ -150,7 +147,6 @@ st.markdown(
             width: 100% !important;
             max-width: 100vw !important;
         }
-        /* Metric cards: 2 per row */
         div[data-testid="stHorizontalBlock"] {
             flex-wrap: wrap !important;
             gap: 8px !important;
@@ -165,27 +161,41 @@ st.markdown(
         }
     }
 
+    /* ── Very small phones ───────────────────────────────────────────────── */
+    @media screen and (max-width: 420px) {
+        .block-container {
+            padding-left: 0.25rem !important;
+            padding-right: 0.25rem !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+        .pg-title { font-size: 16px !important; white-space: normal !important; }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 setup_logging()
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown(
-        """
-        <div style='padding:10px 0 4px 0'>
-            <span style='font-size:20px;font-weight:700;letter-spacing:1px;
-                         color:#58A6FF;font-family:IBM Plex Mono,monospace'>
-                📈 INDIA MACRO
-            </span>
-        </div>
-        <hr style='border-color:#21262D;margin:6px 0 14px 0'>
-        """,
+        "<div style=\"padding:10px 0 4px 0\">"
+        "<span style=\"font-size:20px;font-weight:700;letter-spacing:1px;"
+        "color:#58A6FF;font-family:IBM Plex Mono,monospace\">"
+        "📈 INDIA MACRO"
+        "</span></div>"
+        "<hr style=\"border-color:#21262D;margin:6px 0 14px 0\">",
         unsafe_allow_html=True,
     )
 
     PAGE_OPTIONS = {
-        "⬡  Yield Gap":              "yield_gap",
-        "⇄  Return Spread":          "spread",
-        "📊  Nifty 500 Breadth":     "breadth",
+        "⬡  Yield Gap":          "yield_gap",
+        "⇄  Return Spread":      "spread",
+        "📊  Nifty 500 Breadth": "breadth",
     }
     page_label = st.radio(
         "page",
@@ -201,7 +211,6 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # ── Per-page controls ─────────────────────────────────────────────────────
     if active_page == "yield_gap":
         from data.fetcher import fetch_pe_ratio
         try:
