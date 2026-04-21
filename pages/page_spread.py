@@ -370,42 +370,25 @@ def render() -> None:
         unsafe_allow_html=True,
     )
 
-    # ── Pair selector ─────────────────────────────────────────────────────────
-    pair_label = st.selectbox(
-        "Select pair",
-        _PRESET_LABELS,
-        index=0,            # default: Nifty Smallcap 100 − Nifty 50
-        key="sp_pair",
-        label_visibility="visible",
-    )
-
-    chosen_pair = _PRESET_MAP[pair_label]
-    is_custom   = (chosen_pair[1] == "")   # the ⚙ Custom entry
-
-    if is_custom:
-        # ── Custom: two dropdowns ─────────────────────────────────────────────
-        all_names = list(INSTRUMENTS.keys())
-        cc1, cc2 = st.columns(2)
-        with cc1:
-            name_a_sel = st.selectbox(
-                "Instrument A (top / first)",
-                all_names,
-                index=all_names.index("Nifty 50") if "Nifty 50" in all_names else 0,
-                key="sp_custom_a",
-            )
-        with cc2:
-            name_b_sel = st.selectbox(
-                "Instrument B (bottom / subtracted)",
-                all_names,
-                index=all_names.index("Gold BeES (Nippon)") if "Gold BeES (Nippon)" in all_names else 1,
-                key="sp_custom_b",
-            )
-        ticker_a = INSTRUMENTS[name_a_sel]
-        ticker_b = INSTRUMENTS[name_b_sel]
-        name_a   = name_a_sel
-        name_b   = name_b_sel
-    else:
-        _, ticker_a, name_a, ticker_b, name_b = chosen_pair
+    # ── Pair selector — always custom ────────────────────────────────────────
+    all_names = list(INSTRUMENTS.keys())
+    cc1, cc2 = st.columns(2)
+    with cc1:
+        name_a = st.selectbox(
+            "Instrument A",
+            all_names,
+            index=all_names.index("Nifty 50") if "Nifty 50" in all_names else 0,
+            key="sp_custom_a",
+        )
+    with cc2:
+        name_b = st.selectbox(
+            "Instrument B",
+            all_names,
+            index=all_names.index("Gold BeES (Nippon)") if "Gold BeES (Nippon)" in all_names else 1,
+            key="sp_custom_b",
+        )
+    ticker_a = INSTRUMENTS[name_a]
+    ticker_b = INSTRUMENTS[name_b]
 
     st.divider()
 
