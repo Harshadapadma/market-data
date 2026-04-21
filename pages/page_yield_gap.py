@@ -71,15 +71,6 @@ def render(pe_ratio: float = 21.27) -> None:
     # ── Page header ───────────────────────────────────────────────────────────
     st.markdown(
         """
-        <style>
-        .pg-header { display:flex; flex-wrap:wrap; align-items:baseline;
-                     gap:8px; margin-bottom:8px; padding-left:2px; overflow:visible; }
-        .pg-title  { font-size:clamp(15px,3.5vw,26px); font-weight:700;
-                     color:#58A6FF; font-family:IBM Plex Mono,monospace;
-                     letter-spacing:0px; white-space:normal; }
-        .pg-sub    { font-size:clamp(10px,2vw,13px); color:#8B949E;
-                     font-family:IBM Plex Mono,monospace; }
-        </style>
         <div class='pg-header'>
             <span class='pg-title'>⬡ YIELD GAP</span>
             <span class='pg-sub'>India 10Y Bond Yield − Nifty 50 Earnings Yield</span>

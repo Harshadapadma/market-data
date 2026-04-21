@@ -48,7 +48,6 @@ st.markdown(
         background-color: #0D1117;
         border-right: 1px solid #21262D;
     }
-    /* Hide Streamlit's auto-discovered pages nav */
     [data-testid="stSidebarNav"] { display: none !important; }
 
     /* ── Metric cards ───────────────────────────────────────────────────── */
@@ -68,7 +67,7 @@ st.markdown(
         font-size: clamp(14px, 2.5vw, 20px) !important;
     }
 
-    /* ── Radio buttons (sidebar nav + date presets) ─────────────────────── */
+    /* ── Radio buttons ──────────────────────────────────────────────────── */
     div[data-testid="stRadio"] > div { gap: 4px; }
     div[data-testid="stRadio"] label {
         border: 1px solid #21262D;
@@ -80,14 +79,53 @@ st.markdown(
     div[data-testid="stRadio"] label:hover { border-color: #58A6FF; }
 
     /* ── General layout ─────────────────────────────────────────────────── */
-    .stAlert { border-radius: 8px; }
     .block-container {
-        padding-top: 1.5rem;
+        padding-top: 3.5rem !important;
         padding-bottom: 2rem;
+        max-width: 100% !important;
+    }
+    /* Force Streamlit's top header bar to not clip content */
+    header[data-testid="stHeader"] {
+        height: 0 !important;
+        min-height: 0 !important;
+        visibility: hidden !important;
     }
 
-    /* ── Mobile: metric cards wrap to 2-per-row ─────────────────────────── */
+    /* ── Page header titles (fix clipping on all pages) ─────────────────── */
+    .pg-header {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: baseline !important;
+        gap: 8px !important;
+        margin-bottom: 8px !important;
+        overflow: visible !important;
+        width: 100% !important;
+    }
+    .pg-title {
+        font-size: clamp(14px, 4vw, 24px) !important;
+        font-weight: 700 !important;
+        color: #58A6FF !important;
+        font-family: IBM Plex Mono, monospace !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+    }
+    .pg-sub {
+        font-size: clamp(10px, 2vw, 12px) !important;
+        color: #8B949E !important;
+        font-family: IBM Plex Mono, monospace !important;
+        white-space: normal !important;
+        line-height: 1.4 !important;
+    }
+
+    /* ── Mobile ─────────────────────────────────────────────────────────── */
     @media screen and (max-width: 768px) {
+        .block-container {
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        .stPlotlyChart, .stPlotlyChart > div {
+            width: 100% !important;
+        }
         div[data-testid="stHorizontalBlock"] {
             flex-wrap: wrap !important;
             gap: 8px !important;
@@ -96,18 +134,23 @@ st.markdown(
             min-width: calc(50% - 8px) !important;
             flex: 1 1 calc(50% - 8px) !important;
         }
+        div[data-testid="stRadio"] > div {
+            flex-wrap: wrap !important;
+            gap: 4px !important;
+        }
     }
 
-    /* ── Very small phones: 1 metric per row ────────────────────────────── */
+    /* ── Very small phones ───────────────────────────────────────────────── */
     @media screen and (max-width: 420px) {
-        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-            min-width: 100% !important;
-            flex: 1 1 100% !important;
-        }
         .block-container {
             padding-left: 0.25rem !important;
             padding-right: 0.25rem !important;
         }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+        .pg-title { font-size: 16px !important; white-space: normal !important; }
     }
     </style>
     """,
@@ -208,7 +251,6 @@ with st.sidebar:
     st.markdown(
         "<hr style='border-color:#21262D;margin:10px 0'>"
         "<div style='font-size:10px;color:#484F58;font-family:IBM Plex Mono,monospace'>"
-        "⚠️ Not investment advice"
         "</div>",
         unsafe_allow_html=True,
     )
