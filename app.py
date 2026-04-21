@@ -183,9 +183,9 @@ with st.sidebar:
     )
 
     PAGE_OPTIONS = {
-        "⬡  Yield Gap":          "yield_gap",
-        "⇄  Return Spread":      "spread",
-        "📊  Nifty 500 Breadth": "breadth",
+        "Yield Gap":          "yield_gap",
+        "Return Spread":      "spread",
+        "Outperformance  ": "breadth",
     }
     page_label = st.radio(
         "page",
