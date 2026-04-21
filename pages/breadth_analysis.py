@@ -124,10 +124,11 @@ def plot_breadth_time_series(
         x=pct.index, y=pct,
         mode="lines",
         name="% beating benchmark",
-        line=dict(color=_BLUE, width=0),
+        line=dict(color="rgba(0,0,0,0)", width=8),   # wide transparent hitbox
         customdata=df[["count_eligible", "benchmark_return"]].values,
         hovertemplate=(
-            "<b>%{y:.1f}%</b> of stocks beat benchmark<br>"
+            "<b>%{x|%d %b %Y}</b><br>"
+            "%{y:.1f}% of stocks beat benchmark<br>"
             "Benchmark return: %{customdata[1]:.1f}%<br>"
             "Eligible stocks: %{customdata[0]}<extra></extra>"
         ),
