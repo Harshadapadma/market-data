@@ -165,11 +165,6 @@ def _compute_spread(
     s_a = s_a.reindex(common)
     s_b = s_b.reindex(common)
 
-    # Null out prices on the first day after any data gap > 10 calendar days.
-    # This stops rolling returns from "crossing" the gap and showing fake spikes.
-    s_a = _null_gap_boundaries(s_a)
-    s_b = _null_gap_boundaries(s_b)
-
     ra = _rolling_return(s_a, window)
     rb = _rolling_return(s_b, window)
 
