@@ -110,14 +110,21 @@ def plot_breadth_time_series(
         line=dict(width=0), showlegend=False, hoverinfo="skip",
     ))
 
-    # ── Single line trace with per-point marker colors — hover works on every point
-    point_colors = [_GREEN if v >= mean else _RED for v in pct]
+    # ── Colored line segments (visual only) ───────────────────────────────────
+    colors = [_GREEN if v >= mean else _RED for v in pct]
+    for i in range(len(pct) - 1):
+        fig.add_trace(go.Scatter(
+            x=pct.index[i : i + 2], y=pct.iloc[i : i + 2],
+            mode="lines", line=dict(color=colors[i], width=1.5),
+            showlegend=False, hoverinfo="skip",
+        ))
+
+    # ── Invisible markers at every point — this is what makes hover snap to each day
     fig.add_trace(go.Scatter(
         x=pct.index, y=pct,
-        mode="lines+markers",
+        mode="markers",
         name="% beating benchmark",
-        line=dict(color=_RED, width=1.5),
-        marker=dict(color=point_colors, size=5, line=dict(width=0)),
+        marker=dict(size=8, color="rgba(0,0,0,0)"),
         customdata=df[["count_eligible", "benchmark_return"]].values,
         hovertemplate=(
             "<b>%{x|%d %b %Y}</b><br>"
