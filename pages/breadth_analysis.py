@@ -277,14 +277,18 @@ def _metric(label: str, value: str, color: str = _BLUE) -> str:
 def _header() -> None:
     st.markdown(
         f"""
-        <div style='margin-bottom:4px'>
-            <span style='font-size:26px;font-weight:700;color:{_BLUE};
-                         font-family:{_FONT};letter-spacing:2px'>
-                📊 INDEX BREADTH ANALYSER
-            </span><br>
-            <span style='font-size:12px;color:{_GREY};font-family:{_FONT}'>
-                "What % of Universe stocks outperform the Benchmark's rolling return?"
-            </span>
+        <style>
+        .pg-header {{ display:flex; flex-wrap:wrap; align-items:baseline;
+                      gap:8px; margin-bottom:4px; }}
+        .pg-title  {{ font-size:clamp(16px,3.5vw,26px); font-weight:700;
+                      color:{_BLUE}; font-family:{_FONT};
+                      letter-spacing:2px; white-space:nowrap; }}
+        .pg-sub    {{ font-size:clamp(10px,2vw,12px); color:{_GREY};
+                      font-family:{_FONT}; }}
+        </style>
+        <div class='pg-header'>
+            <span class='pg-title'>📊 INDEX BREADTH ANALYSER</span>
+            <span class='pg-sub'>"What % of stocks outperform the Benchmark's rolling return?"</span>
         </div>
         <hr style='border-color:{_BORDER};margin:10px 0 18px 0'>
         """,

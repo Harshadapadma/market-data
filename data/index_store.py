@@ -203,6 +203,84 @@ def _fetch_yfinance(ticker: str, start: str, end: str) -> pd.Series:
         return pd.Series(dtype=float)
 
 
+def _fetch_from_niftyindices(nse_name: str, start_date: str = "2006-01-01") -> pd.Series:
+    """
+    Fetch full historical closing prices from niftyindices.com (NSE official site).
+    Works for all NSE indices going back to inception. No auth required.
+
+    nse_name: exact NSE archive name, e.g. "Nifty Smallcap 100", "Nifty Midcap 100"
+    """
+    import requests, json as _json, time as _time
+
+    # Map our name to the niftyindices.com API name (uppercase, space-separated)
+    api_name = nse_name.upper()   # e.g. "NIFTY SMALLCAP 100"
+
+    sess = requests.Session()
+    sess.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+        "Referer": "https://www.niftyindices.com/",
+        "Origin":  "https://www.niftyindices.com",
+    })
+
+    start_dt = pd.Timestamp(start_date)
+    end_dt   = pd.Timestamp(date.today())
+
+    # niftyindices.com API accepts max ~1 year chunks; use 2-year chunks to be safe
+    all_records: list[dict] = []
+    chunk_start = start_dt
+    while chunk_start <= end_dt:
+        chunk_end = min(chunk_start + pd.DateOffset(years=2), end_dt)
+        payload = {
+            "name":      api_name,
+            "startDate": chunk_start.strftime("%d-%b-%Y"),   # e.g. "01-Jan-2011"
+            "endDate":   chunk_end.strftime("%d-%b-%Y"),
+        }
+        try:
+            r = sess.post(
+                "https://www.niftyindices.com/Backpage.aspx/getHistoricalData",
+                json=payload, timeout=20,
+            )
+            if r.status_code == 200:
+                outer = r.json()
+                # Response is {"d": "[{...}]"} — double-encoded JSON
+                raw_str = outer.get("d", "[]")
+                rows = _json.loads(raw_str) if isinstance(raw_str, str) else raw_str
+                if isinstance(rows, list):
+                    all_records.extend(rows)
+        except Exception as exc:
+            log.debug("niftyindices chunk %s→%s failed: %s", chunk_start.date(), chunk_end.date(), exc)
+        chunk_start = chunk_end + pd.DateOffset(days=1)
+        _time.sleep(0.1)
+
+    if not all_records:
+        return pd.Series(dtype=float)
+
+    # Parse records → Series
+    results: dict[pd.Timestamp, float] = {}
+    for row in all_records:
+        try:
+            # Column names vary: TIMESTAMP / HistoricalDate / date
+            dt_raw  = row.get("TIMESTAMP") or row.get("HistoricalDate") or row.get("date", "")
+            val_raw = (row.get("CLOSING_INDEX_VAL") or row.get("Close")
+                       or row.get("close") or row.get("closingIndexVal", ""))
+            ts  = pd.Timestamp(str(dt_raw).strip())
+            val = float(str(val_raw).replace(",", ""))
+            if val > 0:
+                results[ts] = val
+        except Exception:
+            pass
+
+    if not results:
+        return pd.Series(dtype=float)
+
+    s = pd.Series(results, name=nse_name).sort_index()
+    log.info("niftyindices '%s': %d rows (%s → %s)", nse_name, len(s),
+             s.index[0].date(), s.index[-1].date())
+    return s
+
+
 def _fetch_nsei_from_existing_cache() -> pd.Series:
     """
     Reuse the existing Nifty 50 cache managed by data.fetcher.
@@ -299,19 +377,25 @@ def get_price(
 
     if cached.empty:
         if use_nse:
-            # Full download from NSE archives (more complete than yfinance)
-            nse_start = max(start_date, "2011-01-03")   # archives start ~2011
-            new_nse = _fetch_from_nse_archive(nse_name, nse_start, str(today))
-            if not new_nse.empty:
-                pieces.append(new_nse)
-                status["source"] = "NSE archives (full)"
-            # For dates before 2011, try yfinance as supplement
-            if date.fromisoformat(start_date) < date(2011, 1, 3):
-                yf_end = "2011-01-04"
-                old = _fetch_yfinance(ticker, start_date, yf_end)
-                if not old.empty:
-                    pieces.append(old)
-                    status["source"] = "NSE archives + yfinance (pre-2011)"
+            # Try 1: yfinance (fast, full history where available)
+            new_yf = _fetch_yfinance(ticker, start_date, fetch_end)
+            if not new_yf.empty and len(new_yf) > 100:
+                pieces.append(new_yf)
+                status["source"] = "yfinance (full)"
+            else:
+                # Try 2: niftyindices.com (NSE official, full history, no gaps)
+                if nse_name:
+                    new_ni = _fetch_from_niftyindices(nse_name, start_date)
+                    if not new_ni.empty:
+                        pieces.append(new_ni)
+                        status["source"] = "niftyindices.com (full)"
+                # Try 3: NSE daily archives (recent months only)
+                if not pieces:
+                    nse_start = max(start_date, "2011-01-03")
+                    new_arc = _fetch_from_nse_archive(nse_name, nse_start, str(today))
+                    if not new_arc.empty:
+                        pieces.append(new_arc)
+                        status["source"] = "NSE archives (recent)"
         else:
             new = _fetch_yfinance(ticker, start_date, fetch_end)
             if not new.empty:
@@ -355,8 +439,9 @@ def get_price(
             if not pieces:
                 status["message"] = f"Cached {len(cached)} rows up to {last_cached}"
 
-        # ── Gap-fill: detect and fill holes in NSE-sourced data ───────────────
-        # The old ^NSMIDCP yfinance data had a 403-day gap. Patch it.
+        # ── Gap-fill: detect and fill holes in cached data ───────────────────
+        # ^NSMIDCP yfinance had a 403-day gap (Nov 2015 – Dec 2016).
+        # Try niftyindices.com first (has full history), then NSE archive.
         if use_nse and not cached.empty and len(pieces) == 0:
             diffs = cached.index.to_series().diff().dt.days
             big_gaps = diffs[diffs > 20]
@@ -367,7 +452,14 @@ def get_price(
                     gap_e = str(gap_end_ts.date())
                     log.info("Filling %d-day gap in %s: %s → %s",
                              int(big_gaps.loc[gap_end_ts]), ticker, gap_s, gap_e)
-                    fill = _fetch_from_nse_archive(nse_name, gap_s, gap_e)
+                    # Try niftyindices.com for the specific gap window
+                    fill = _fetch_from_niftyindices(nse_name, gap_s) if nse_name else pd.Series(dtype=float)
+                    if not fill.empty:
+                        fill = fill[(fill.index >= pd.Timestamp(gap_s)) &
+                                    (fill.index <= pd.Timestamp(gap_e))]
+                    if fill.empty:
+                        # Fallback: NSE daily archive (only works for recent gaps)
+                        fill = _fetch_from_nse_archive(nse_name, gap_s, gap_e)
                     if not fill.empty:
                         pieces.append(fill)
                         status["source"] = "NSE archives (gap-fill)"

@@ -29,6 +29,7 @@ from data.index_store import (
     INSTRUMENTS, _TICKER_TO_NSE_NAME,
     _csv_path, _load_csv, _save_csv,
     _fetch_yfinance, _fix_consolidation_spikes,
+    _fetch_from_niftyindices,
 )
 
 print("\n" + "=" * 60)
@@ -107,14 +108,21 @@ for name, ticker in INDIAN_INDICES.items():
             print(f"  🔧 {name:30s}  stale (last: {last_d}) — fetching incremental…")
 
     # ── Fresh or incremental download ──────────────────────────────────────────
-    # For indices with known gaps: force full re-download to get clean data
     last_cached = existing.index[-1].date() if not existing.empty else None
     diffs       = existing.index.to_series().diff().dt.days if not existing.empty else pd.Series()
     has_gap     = bool((diffs > 20).any()) if not diffs.empty else False
 
     if has_gap or existing.empty:
-        # Full re-download
+        # Try 1: yfinance full re-download
         new = _yf_full(ticker, start="2006-01-01")
+        if new.empty or len(new) < MIN_ROWS:
+            # Try 2: niftyindices.com (NSE official — has full gapless history)
+            nse_name = _TICKER_TO_NSE_NAME.get(ticker)
+            if nse_name:
+                print(f"      yfinance insufficient → trying niftyindices.com for '{nse_name}'…")
+                new = _fetch_from_niftyindices(nse_name, start_date="2006-01-01")
+                if not new.empty:
+                    print(f"      ✓ niftyindices: {len(new)} rows")
     else:
         # Incremental: only fetch missing tail
         start_inc = str(last_cached + timedelta(days=1))
@@ -123,18 +131,18 @@ for name, ticker in INDIAN_INDICES.items():
     # ── Merge ──────────────────────────────────────────────────────────────────
     if not new.empty:
         if has_gap or existing.empty:
-            combined = new  # full re-download replaces gappy cache
+            combined = new
         else:
             combined = pd.concat([existing, new]).sort_index()
             combined = combined[~combined.index.duplicated(keep="last")]
     else:
         combined = existing
 
-    # ── Try alternatives if still no data ──────────────────────────────────────
+    # ── Try yfinance alternative tickers if still no data ────────────────────
     if combined.empty or len(combined) < MIN_ROWS:
         alts = ALTERNATIVES.get(ticker, [])
         for alt_ticker in alts:
-            print(f"      Trying alternative: {alt_ticker}…")
+            print(f"      Trying alternative ticker: {alt_ticker}…")
             alt = _yf_full(alt_ticker, start="2006-01-01")
             if not alt.empty and len(alt) >= MIN_ROWS:
                 combined = alt

@@ -136,9 +136,25 @@ def _compute_spread(
     ra = _rolling_return(s_a, window)
     rb = _rolling_return(s_b, window)
 
-    spread = (ra - rb).dropna()
-    ra = ra.reindex(spread.index)
-    rb = rb.reindex(spread.index)
+    spread = ra - rb
+
+    # ── Expose data gaps so Plotly draws a break, not a fake straight line ────
+    # Reindex to full calendar; forward-fill only weekends & short holidays
+    # (≤5 days). Any gap longer than that stays NaN → visible gap in chart.
+    if not spread.empty:
+        full_idx = pd.date_range(spread.index[0], spread.index[-1], freq="D")
+        spread = spread.reindex(full_idx).ffill(limit=5)
+        ra     = ra.reindex(full_idx).ffill(limit=5)
+        rb     = rb.reindex(full_idx).ffill(limit=5)
+
+    # Drop leading/trailing NaN but keep interior NaN (they mark real gaps)
+    first_valid = spread.first_valid_index()
+    last_valid  = spread.last_valid_index()
+    if first_valid and last_valid:
+        spread = spread.loc[first_valid:last_valid]
+        ra     = ra.loc[first_valid:last_valid]
+        rb     = rb.loc[first_valid:last_valid]
+
     return ra, rb, spread
 
 
@@ -146,13 +162,14 @@ def _stats(spread: pd.Series) -> dict:
     c = spread.dropna()
     if c.empty:
         return {}
+    last_val = float(c.iloc[-1])
     return {
         "mean": float(c.mean()),
         "std":  float(c.std()),
         "min":  float(c.min()),
         "max":  float(c.max()),
-        "last": float(c.iloc[-1]),
-        "pct":  float((c < c.iloc[-1]).mean() * 100),
+        "last": last_val,
+        "pct":  float((c < last_val).mean() * 100),
     }
 
 
@@ -304,15 +321,18 @@ def render() -> None:
     # ── Page header ───────────────────────────────────────────────────────────
     st.markdown(
         """
-        <div style='margin-bottom:8px'>
-            <span style='font-size:26px;font-weight:700;color:#58A6FF;
-                         font-family:IBM Plex Mono,monospace;letter-spacing:2px'>
-                ⇄ RETURN SPREAD
-            </span>
-            <span style='font-size:13px;color:#8B949E;margin-left:16px;
-                         font-family:IBM Plex Mono,monospace'>
-                Any two instruments &nbsp;·&nbsp; Rolling return diff with Avg / ±1σ / ±2σ bands
-            </span>
+        <style>
+        .pg-header { display:flex; flex-wrap:wrap; align-items:baseline;
+                     gap:8px; margin-bottom:8px; }
+        .pg-title  { font-size:clamp(18px,4vw,26px); font-weight:700;
+                     color:#58A6FF; font-family:IBM Plex Mono,monospace;
+                     letter-spacing:2px; white-space:nowrap; }
+        .pg-sub    { font-size:clamp(11px,2vw,13px); color:#8B949E;
+                     font-family:IBM Plex Mono,monospace; }
+        </style>
+        <div class='pg-header'>
+            <span class='pg-title'>⇄ RETURN SPREAD</span>
+            <span class='pg-sub'>Any two instruments &nbsp;·&nbsp; Rolling return diff with Avg / ±1σ / ±2σ bands</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -358,26 +378,23 @@ def render() -> None:
     st.divider()
 
     # ── Window + date filter ─────────────────────────────────────────────────
-    wc, dc = st.columns([2, 8])
-    with wc:
-        window_opts = {
-            "1M  (21D)":  21,
-            "3M  (63D)":  63,
-            "6M (126D)": 126,
-            "1Y (252D)": 252,
-            "2Y (504D)": 504,
-        }
-        wlabel = st.selectbox(
-            "Lookback period",
-            list(window_opts.keys()),
-            index=3,          # default 1Y
-            key="sp_window",
-        )
-        window = window_opts[wlabel]
+    window_opts = {
+        "1M  (21D)":  21,
+        "3M  (63D)":  63,
+        "6M (126D)": 126,
+        "1Y (252D)": 252,
+        "2Y (504D)": 504,
+    }
+    wlabel = st.selectbox(
+        "Lookback period",
+        list(window_opts.keys()),
+        index=3,
+        key="sp_window",
+    )
+    window = window_opts[wlabel]
 
-    with dc:
-        st.markdown("**📅 Date range**")
-        date_from, date_to = _date_filter()
+    st.markdown("**📅 Date range**")
+    date_from, date_to = _date_filter()
 
     # ── Data fetch ────────────────────────────────────────────────────────────
     with st.spinner(f"Loading {name_a} and {name_b}…"):
