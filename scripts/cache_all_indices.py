@@ -112,12 +112,13 @@ for name, ticker in INDIAN_INDICES.items():
     diffs       = existing.index.to_series().diff().dt.days if not existing.empty else pd.Series()
     has_gap     = bool((diffs > 20).any()) if not diffs.empty else False
 
+    nse_name = _TICKER_TO_NSE_NAME.get(ticker)
+
     if has_gap or existing.empty:
         # Try 1: yfinance full re-download
         new = _yf_full(ticker, start="2006-01-01")
         if new.empty or len(new) < MIN_ROWS:
-            # Try 2: niftyindices.com (NSE official — has full gapless history)
-            nse_name = _TICKER_TO_NSE_NAME.get(ticker)
+            # Try 2: niftyindices.com (NSE official — full gapless history)
             if nse_name:
                 print(f"      yfinance insufficient → trying niftyindices.com for '{nse_name}'…")
                 new = _fetch_from_niftyindices(nse_name, start_date="2006-01-01")
@@ -148,6 +149,26 @@ for name, ticker in INDIAN_INDICES.items():
                 combined = alt
                 print(f"      ✓ Got {len(combined)} rows from {alt_ticker}")
                 break
+
+    # ── Gap-fill: patch any remaining internal gaps via niftyindices.com ──────
+    # e.g. ^NSMIDCP yfinance has a 256-day gap in 2016 that yfinance never fixed
+    if nse_name and not combined.empty:
+        diffs_check = combined.index.to_series().diff().dt.days
+        inner_gaps  = diffs_check[diffs_check > 20]
+        if not inner_gaps.empty:
+            print(f"      Detected {len(inner_gaps)} gap(s) — patching via niftyindices.com…")
+            try:
+                full_ni = _fetch_from_niftyindices(nse_name, start_date="2006-01-01")
+                if not full_ni.empty:
+                    combined = pd.concat([combined, full_ni]).sort_index()
+                    combined = combined[~combined.index.duplicated(keep="last")]
+                    # Re-check gaps
+                    diffs_after2 = combined.index.to_series().diff().dt.days
+                    still_gaps   = (diffs_after2 > 20).sum()
+                    msg = f"gaps closed" if not still_gaps else f"{still_gaps} gap(s) remain"
+                    print(f"      ✓ niftyindices patch: {len(full_ni)} rows fetched — {msg}")
+            except Exception as e:
+                print(f"      ⚠️ niftyindices gap-fill failed: {e}")
 
     # ── Save result ────────────────────────────────────────────────────────────
     if not combined.empty and len(combined) >= MIN_ROWS:
