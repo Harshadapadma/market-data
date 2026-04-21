@@ -356,10 +356,10 @@ def render() -> None:
         <style>
         .pg-header { display:flex; flex-wrap:wrap; align-items:baseline;
                      gap:8px; margin-bottom:8px; padding-left:2px; overflow:visible; }
-        .pg-title  { font-size:clamp(18px,4vw,26px); font-weight:700;
+        .pg-title  { font-size:clamp(15px,3.5vw,26px); font-weight:700;
                      color:#58A6FF; font-family:IBM Plex Mono,monospace;
-                     letter-spacing:1px; white-space:nowrap; }
-        .pg-sub    { font-size:clamp(11px,2vw,13px); color:#8B949E;
+                     letter-spacing:0px; white-space:normal; }
+        .pg-sub    { font-size:clamp(10px,2vw,13px); color:#8B949E;
                      font-family:IBM Plex Mono,monospace; }
         </style>
         <div class='pg-header'>
@@ -460,7 +460,7 @@ def render() -> None:
     delta = last - mean
     pct   = stats["pct"]
 
-    m1, m2, m3, m4, m5 = st.columns([1, 1, 1, 1, 1])
+    m1, m2, m3, m4 = st.columns([1, 1, 1, 1])
     with m1:
         st.metric("Spread Now", f"{last:+.2f}%",
                   help=f"Latest rolling {wlabel} return: {name_a} − {name_b}")
@@ -473,9 +473,6 @@ def render() -> None:
     with m4:
         st.metric("vs Avg", f"{delta:+.2f}%",
                   delta_color="normal")
-    with m5:
-        st.metric("Pctile", f"{pct:.0f}th",
-                  help="% of historical readings below the current spread")
 
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 

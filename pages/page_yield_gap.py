@@ -74,10 +74,10 @@ def render(pe_ratio: float = 21.27) -> None:
         <style>
         .pg-header { display:flex; flex-wrap:wrap; align-items:baseline;
                      gap:8px; margin-bottom:8px; padding-left:2px; overflow:visible; }
-        .pg-title  { font-size:clamp(18px,4vw,26px); font-weight:700;
+        .pg-title  { font-size:clamp(15px,3.5vw,26px); font-weight:700;
                      color:#58A6FF; font-family:IBM Plex Mono,monospace;
-                     letter-spacing:1px; white-space:nowrap; }
-        .pg-sub    { font-size:clamp(11px,2vw,13px); color:#8B949E;
+                     letter-spacing:0px; white-space:normal; }
+        .pg-sub    { font-size:clamp(10px,2vw,13px); color:#8B949E;
                      font-family:IBM Plex Mono,monospace; }
         </style>
         <div class='pg-header'>
@@ -155,8 +155,8 @@ def render(pe_ratio: float = 21.27) -> None:
         unsafe_allow_html=True,
     )
 
-    # ── Metric cards (5 → wraps to 2-3 on mobile via global CSS) ─────────────
-    c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1, 1])
+    # ── Metric cards ──────────────────────────────────────────────────────────
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
     gap          = stats["latest_yield_gap"]
     avg          = stats["yield_gap_1y_avg"]
     delta_vs_avg = gap - avg
@@ -170,10 +170,6 @@ def render(pe_ratio: float = 21.27) -> None:
                   delta=f"{delta_vs_avg:+.3f}% vs 1Y avg", delta_color="normal")
     with c4:
         st.metric("📊 1Y Avg Gap", f"{avg:+.3f}%")
-    with c5:
-        pct = (df_full["yield_gap"] < gap).mean() * 100
-        st.metric("📐 Hist. Pctile", f"{pct:.0f}th",
-                  help="Percentile vs full history since 2006")
 
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
@@ -181,13 +177,9 @@ def render(pe_ratio: float = 21.27) -> None:
     # Pass df_full so SD bands use full history even when view is date-filtered
     st.plotly_chart(plot_yield_gap_with_bands(df, df_full=df_full), use_container_width=True)
 
-    # ── Chart 2 + 3: Bond vs EY  |  Distribution (stack on mobile) ───────────
-    col_a, col_b = st.columns([5, 3])
-    with col_a:
-        st.plotly_chart(plot_yields(df), use_container_width=True)
-    with col_b:
-        st.plotly_chart(plot_distribution(df), use_container_width=True)
-    # Note: on mobile the global CSS wraps these to full-width stacked columns
+    # ── Chart 2 + 3: Bond vs EY  |  Distribution (stacked on mobile) ───────
+    st.plotly_chart(plot_yields(df), use_container_width=True)
+    st.plotly_chart(plot_distribution(df), use_container_width=True)
 
     # ── Raw data table ────────────────────────────────────────────────────────
     with st.expander("📋 Raw Data", expanded=False):
