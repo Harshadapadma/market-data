@@ -199,6 +199,80 @@ def _cache_up_to_date(ticker: str) -> bool:
     return (today - last).days <= 3
 
 
+# ── NSE Bhavcopy — today's close, published ~30 min after market close ─────────
+
+def _fetch_bhavcopy_today() -> dict[str, float]:
+    """
+    Download today's NSE equity bhavcopy and return {SYMBOL: close_price}.
+    URL: https://archives.nseindia.com/content/historical/EQUITIES/YYYY/MON/cmDDMONYYYYbhav.csv.zip
+    Falls back to yesterday if today's isn't published yet.
+    """
+    import io, zipfile, requests
+
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    today = date.today()
+
+    for d in [today, today - timedelta(days=1), today - timedelta(days=2)]:
+        if d.weekday() >= 5:   # skip weekends
+            continue
+        mon = d.strftime("%b").upper()
+        url = (
+            f"https://archives.nseindia.com/content/historical/EQUITIES/"
+            f"{d.year}/{mon}/cm{d.strftime('%d')}{mon}{d.year}bhav.csv.zip"
+        )
+        try:
+            r = requests.get(url, headers=headers, timeout=15)
+            if r.status_code != 200:
+                continue
+            zf = zipfile.ZipFile(io.BytesIO(r.content))
+            csv_name = [n for n in zf.namelist() if n.endswith(".csv")][0]
+            df = pd.read_csv(io.BytesIO(zf.read(csv_name)))
+            # Keep only EQ series; columns: SYMBOL, SERIES, CLOSE
+            df = df[df["SERIES"] == "EQ"][["SYMBOL", "CLOSE"]].dropna()
+            result = dict(zip(df["SYMBOL"].str.strip(), df["CLOSE"]))
+            if result:
+                log.info("Bhavcopy loaded for %s (%d symbols)", d, len(result))
+                return result, d
+        except Exception as exc:
+            log.debug("Bhavcopy fetch failed for %s: %s", d, exc)
+
+    return {}, None
+
+
+def _patch_cache_with_bhavcopy(
+    tickers: list[str],
+    symbol_map: dict[str, str],          # ticker → NSE symbol (e.g. RELIANCE.NS → RELIANCE)
+) -> date | None:
+    """
+    Fetch today's bhavcopy and update cached price CSVs for all tickers.
+    Returns the bhavcopy date if successful, else None.
+    """
+    prices, bhav_date = _fetch_bhavcopy_today()
+    if not prices or bhav_date is None:
+        return None
+
+    bhav_ts = pd.Timestamp(bhav_date)
+    patched = 0
+    for ticker in tickers:
+        sym = symbol_map.get(ticker, ticker.replace(".NS", ""))
+        if sym not in prices:
+            continue
+        cached = _load_cached_price(ticker)
+        if cached is not None and not cached.empty:
+            if cached.index[-1] >= bhav_ts:
+                continue          # already has today
+            new_row = pd.Series([prices[sym]], index=[bhav_ts])
+            combined = pd.concat([cached, new_row])
+            combined = combined[~combined.index.duplicated(keep="last")].sort_index()
+        else:
+            combined = pd.Series([prices[sym]], index=[bhav_ts])
+        _save_cached_price(ticker, combined)
+        patched += 1
+
+    log.info("Bhavcopy patch: updated %d / %d tickers for %s", patched, len(tickers), bhav_date)
+    return bhav_date
+
+
 # ── Price fetching (incremental) ───────────────────────────────────────────────
 
 def fetch_single_price(ticker: str, start: str = DATA_START) -> pd.Series:
@@ -211,8 +285,8 @@ def fetch_single_price(ticker: str, start: str = DATA_START) -> pd.Series:
     cached = _load_cached_price(ticker)
     if cached is not None and not cached.empty:
         last = cached.index[-1].date()
-        if (today - last).days <= 3:
-            return cached                          # already current
+        if last >= today:
+            return cached                          # already have today
         fetch_start = str(last + timedelta(days=1))
     else:
         cached = pd.Series(dtype=float)
@@ -276,7 +350,7 @@ def fetch_prices_batch(
         cached = _load_cached_price(t)
         if cached is not None and not cached.empty:
             last = cached.index[-1].date()
-            if (today - last).days <= 3:
+            if last >= today:               # already have today — truly fresh
                 fresh.append(t)
                 all_series[t] = cached
             else:
@@ -356,7 +430,25 @@ def fetch_prices_batch(
 
     df = pd.DataFrame(all_series)
     df.index = pd.to_datetime(df.index)
-    return df.sort_index()
+    df = df.sort_index()
+
+    # ── Patch today's close from NSE Bhavcopy (faster than yfinance) ─────────
+    symbol_map = {t: t.replace(".NS", "") for t in tickers}
+    _patch_cache_with_bhavcopy(list(all_series.keys()), symbol_map)
+
+    # Reload today's row from cache into df
+    today_ts = pd.Timestamp(date.today())
+    if today_ts not in df.index:
+        today_rows = {}
+        for t in all_series:
+            c = _load_cached_price(t)
+            if c is not None and not c.empty and c.index[-1] >= today_ts:
+                today_rows[t] = c.loc[today_ts] if today_ts in c.index else float("nan")
+        if today_rows:
+            today_df = pd.DataFrame([today_rows], index=[today_ts])
+            df = pd.concat([df, today_df]).sort_index()
+
+    return df
 
 
 # ── Breadth computation (vectorised, daily by default) ────────────────────────

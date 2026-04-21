@@ -394,8 +394,14 @@ def render_breadth_analysis() -> None:
     _auto_run     = (_cached_count >= int(_approx_size * 0.8))
 
     cached_result = st.session_state.get("breadth_result")
+    _result_stale = (
+        cached_result is not None
+        and cached_result.get("breadth_df") is not None
+        and cached_result["breadth_df"].index[-1].date() < date.today()
+    )
     _session_hit  = (
         cached_result is not None
+        and not _result_stale
         and cached_result.get("universe")  == universe_name
         and cached_result.get("benchmark") == benchmark_name
         and cached_result.get("window")    == window_days
