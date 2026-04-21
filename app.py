@@ -117,15 +117,40 @@ st.markdown(
         line-height: 1.4 !important;
     }
 
-    /* ── Mobile ─────────────────────────────────────────────────────────── */
+/* ── Mobile ─────────────────────────────────────────────────────────── */
     @media screen and (max-width: 768px) {
-        .block-container {
-            padding-left: 0.5rem !important;
-            padding-right: 0.5rem !important;
+        /* Kill sidebar ghost margin so charts get full width */
+        section[data-testid="stSidebar"] {
+            width: 0 !important;
+            min-width: 0 !important;
         }
-        .stPlotlyChart, .stPlotlyChart > div {
+        .appview-container .main {
+            margin-left: 0 !important;
+            padding-left: 0 !important;
+        }
+        /* Full-width main content area */
+        .appview-container {
+            flex-direction: column !important;
+        }
+        .block-container {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+            padding-top: 3rem !important;
+            max-width: 100vw !important;
             width: 100% !important;
         }
+        /* Charts fill viewport */
+        .stPlotlyChart {
+            width: 100% !important;
+            max-width: 100vw !important;
+        }
+        .stPlotlyChart > div,
+        .stPlotlyChart iframe,
+        .stPlotlyChart > div > div {
+            width: 100% !important;
+            max-width: 100vw !important;
+        }
+        /* Metric cards: 2 per row */
         div[data-testid="stHorizontalBlock"] {
             flex-wrap: wrap !important;
             gap: 8px !important;
@@ -139,23 +164,6 @@ st.markdown(
             gap: 4px !important;
         }
     }
-
-    /* ── Very small phones ───────────────────────────────────────────────── */
-    @media screen and (max-width: 420px) {
-        .block-container {
-            padding-left: 0.25rem !important;
-            padding-right: 0.25rem !important;
-        }
-        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-            min-width: 100% !important;
-            flex: 1 1 100% !important;
-        }
-        .pg-title { font-size: 16px !important; white-space: normal !important; }
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
 
 setup_logging()
 
