@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -67,8 +68,15 @@ def _base_layout(title: str, ytitle: str, date_span_years: float = 99) -> dict:
             ticksuffix="%",
             dtick=10,
         ),
-        margin=dict(l=50, r=140, t=50, b=60, autoexpand=True),
+        margin=dict(l=60, r=140, t=50, b=60, autoexpand=True),
         hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor="#1C2128",
+            bordercolor="#30363D",
+            font=dict(family=_FONT, size=12, color=_WHITE),
+            align="left",
+            namelength=-1,
+        ),
         legend=dict(
             orientation="h",
             yanchor="top", y=1.08,
@@ -89,7 +97,7 @@ def plot_breadth_time_series(
     pct = df["pct_beating"]
 
     if full_pct is not None and len(full_pct) >= 10:
-        _monthly = full_pct.resample("BME").last().dropna()
+        _monthly   = full_pct.resample("BME").last().dropna()
         _stats_pct = _monthly if len(_monthly) >= 10 else full_pct
     else:
         _stats_pct = pct
@@ -98,37 +106,86 @@ def plot_breadth_time_series(
 
     fig = go.Figure()
 
-    # ── Single line — color based on latest value vs mean ────────────────────
-    line_color = _GREEN if float(pct.iloc[-1]) >= mean else _RED
+    # ── Coloured visible lines (monthly points, no hover) ────────────────────
+    vals    = pct.values.astype(float)
+    n       = len(vals)
+    green_y = np.full(n, np.nan)
+    red_y   = np.full(n, np.nan)
+    for i in range(n):
+        if vals[i] >= mean:
+            green_y[i] = vals[i]
+        else:
+            red_y[i] = vals[i]
+    for i in range(1, n):
+        if (vals[i] >= mean) != (vals[i - 1] >= mean):
+            green_y[i - 1] = vals[i - 1]; green_y[i] = vals[i]
+            red_y[i - 1]   = vals[i - 1]; red_y[i]   = vals[i]
+
     fig.add_trace(go.Scatter(
-        x=pct.index, y=pct,
-        mode="lines",
+        x=pct.index, y=green_y, mode="lines",
         name="% beating benchmark",
-        line=dict(color=line_color, width=1.8),
-        customdata=df[["count_eligible", "benchmark_return"]].values,
+        line=dict(color=_GREEN, width=1.8),
+        hoverinfo="skip",
+    ))
+    fig.add_trace(go.Scatter(
+        x=pct.index, y=red_y, mode="lines",
+        showlegend=False, line=dict(color=_RED, width=1.8),
+        hoverinfo="skip",
+    ))
+
+    # ── Daily forward-filled hover trace ─────────────────────────────────────
+    # The breadth series is monthly (BME), so there is only ~1 real data point
+    # per month.  Plotly finds nothing to hover on most days.  Fix: resample to
+    # daily by forward-filling so every calendar day has a value — identical to
+    # how the spread chart works (which stores daily data natively).
+    if not pct.empty:
+        daily_idx   = pd.date_range(pct.index[0], pct.index[-1], freq="D")
+        hover_pct   = pct.reindex(daily_idx).ffill()
+        hover_count = df["count_eligible"].reindex(daily_idx).ffill()
+        hover_bench = df["benchmark_return"].reindex(daily_idx).ffill()
+    else:
+        hover_pct   = pct
+        hover_count = df["count_eligible"]
+        hover_bench = df["benchmark_return"]
+
+    cd = np.column_stack([
+        hover_count.values.astype(float),
+        hover_bench.values.astype(float),
+    ])
+
+    fig.add_trace(go.Scatter(
+        x=hover_pct.index,
+        y=hover_pct,
+        mode="lines",
+        showlegend=False,
+        name="",
+        line=dict(color="rgba(0,0,0,0)", width=16),
+        customdata=cd,
         hovertemplate=(
-            "<b>%{x|%d %b %Y}</b><br>"
-            "%{y:.1f}% of stocks beat benchmark<br>"
+            "Breadth: <b>%{y:.1f}%</b> beating benchmark<br>"
             "Benchmark return: %{customdata[1]:.1f}%<br>"
-            "Eligible stocks: %{customdata[0]:.0f}<extra></extra>"
+            "Eligible stocks: %{customdata[0]:.0f}"
+            "<extra></extra>"
         ),
     ))
 
+    # ── 6M moving average ────────────────────────────────────────────────────
     ma = pct.rolling(6).mean()
     fig.add_trace(go.Scatter(
         x=ma.index, y=ma,
         mode="lines", name="6M Moving Avg",
         line=dict(color=_YELLOW, width=1.0, dash="dot"),
         opacity=0.6,
-        hovertemplate="6M MA: %{y:.1f}%<extra></extra>",
+        hoverinfo="skip",
     ))
 
+    # ── Std-dev band lines ───────────────────────────────────────────────────
     sd_levels = [
-        (f"+2s  {min(mean + 2*std, 100):.1f}%", min(mean + 2*std, 100), "#00CED1", "dash"),
-        (f"+1s  {min(mean +   std, 100):.1f}%", min(mean +   std, 100), "#3FB950", "dash"),
-        (f"Avg  {mean:.1f}%",                    mean,                   "#F0883E", "solid"),
-        (f"-1s  {max(mean -   std, 0):.1f}%",   max(mean -   std, 0),   "#D2A8FF", "dash"),
-        (f"-2s  {max(mean - 2*std, 0):.1f}%",   max(mean - 2*std, 0),   "#F85149", "dash"),
+        (f"+2s  {min(mean + 2 * std, 100):.1f}%", min(mean + 2 * std, 100), "#00CED1", "dash"),
+        (f"+1s  {min(mean +     std, 100):.1f}%", min(mean +     std, 100), "#3FB950", "dash"),
+        (f"Avg  {mean:.1f}%",                      mean,                     "#F0883E", "solid"),
+        (f"-1s  {max(mean -     std,   0):.1f}%", max(mean -     std,   0), "#D2A8FF", "dash"),
+        (f"-2s  {max(mean - 2 * std,   0):.1f}%", max(mean - 2 * std,   0), "#F85149", "dash"),
     ]
     for label, level, colour, dash in sd_levels:
         fig.add_hline(y=level, line=dict(color=colour, width=1.2, dash=dash))
@@ -148,6 +205,16 @@ def plot_breadth_time_series(
         date_span_years=span_years,
     )
     layout["yaxis"]["range"] = [0, 100]
+    layout["hoverdistance"] = 40
+    layout["spikedistance"] = 40
+    layout["xaxis"].update(dict(
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikecolor=_GREY,
+        spikethickness=1,
+        spikedash="dot",
+    ))
     if not pct.empty:
         layout["xaxis"]["range"] = [
             pct.index[0].strftime("%Y-%m-%d"),
@@ -550,10 +617,10 @@ def _render_results(
     with st.expander("Raw Breadth Data", expanded=False):
         st.dataframe(
             df.sort_index(ascending=False).style.format({
-                "pct_beating":          "{:.1f}",
-                "benchmark_return":     "{:+.2f}",
-                "median_stock_return":  "{:+.2f}",
-                "mean_stock_return":    "{:+.2f}",
+                "pct_beating":         "{:.1f}",
+                "benchmark_return":    "{:+.2f}",
+                "median_stock_return": "{:+.2f}",
+                "mean_stock_return":   "{:+.2f}",
             }),
             use_container_width=True,
             height=300,

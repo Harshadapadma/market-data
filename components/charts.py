@@ -49,7 +49,7 @@ def _dark_layout(
     title: str = "",
     height: int = 400,
     span_years: float = 99,
-    right_margin: int = 160,
+    right_margin: int = 20,
 ) -> go.Figure:
     if span_years <= (31 / 365.25):
         dtick, tickfmt, tickangle = 86_400_000,     "%d %b",  45
@@ -159,23 +159,26 @@ def plot_yield_gap_with_bands(
     std  = float(_gap_full.std())
 
     sd_levels = [
-        (f"+2σ  ({mean + 2*std:+.2f}%)", mean + 2*std, "#00CED1", "dash"),
-        (f"+1σ  ({mean +   std:+.2f}%)", mean +   std, "#3FB950", "dash"),
-        (f"Mean ({mean:+.2f}%)",          mean,         "#F0883E", "solid"),
-        (f"-1σ  ({mean -   std:+.2f}%)", mean -   std, "#D2A8FF", "dash"),
-        (f"-2σ  ({mean - 2*std:+.2f}%)", mean - 2*std, "#F85149", "dash"),
+        (f"+2σ ({mean + 2*std:+.2f}%)", mean + 2*std, "#00CED1", "dash"),
+        (f"+1σ ({mean +   std:+.2f}%)", mean +   std, "#3FB950", "dash"),
+        (f"Mean ({mean:+.2f}%)",         mean,         "#F0883E", "solid"),
+        (f"-1σ ({mean -   std:+.2f}%)", mean -   std, "#D2A8FF", "dash"),
+        (f"-2σ ({mean - 2*std:+.2f}%)", mean - 2*std, "#F85149", "dash"),
     ]
 
     for _, level, colour, dash in sd_levels:
         fig.add_hline(y=level, line=dict(color=colour, width=1.4, dash=dash))
 
+    # Labels sit in the right margin — outside the plot area, no overlap with data
     for i, (label, level, colour, _) in enumerate(sd_levels):
         fig.add_annotation(
             x=1.01, xref="paper",
             y=level, yref="y",
-            text=label, showarrow=False,
+            text=label,
+            showarrow=False,
             font=dict(color=colour, size=9, family=_FONT_FAMILY),
-            xanchor="left", align="left",
+            xanchor="left",
+            align="left",
             yshift=i * 2,
         )
 
@@ -209,7 +212,7 @@ def plot_yield_gap_with_bands(
         title="Yield Gap  .  Historical Mean  .  +/-1s / +/-2s",
         height=420,
         span_years=span_years,
-        right_margin=155,
+        right_margin=150,   # space reserved for the outside labels
     )
     fig.update_layout(yaxis=dict(range=[y_min - pad, y_max + pad]))
 
