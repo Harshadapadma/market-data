@@ -111,8 +111,40 @@ def _date_filter() -> tuple[date, date]:
 # ── Computation ────────────────────────────────────────────────────────────────
 
 def _rolling_return(s: pd.Series, window: int) -> pd.Series:
-    r = s.pct_change(window) * 100
+    r = s.pct_change(window, fill_method=None) * 100
     return r.clip(-300, 300)
+
+
+def _null_gap_boundaries(
+    s: pd.Series,
+    max_cal_gap: int = 10,
+    max_single_day_chg: float = 0.30,
+) -> pd.Series:
+    """
+    Set the price to NaN on days that carry a data-stitching artefact:
+
+    1. Calendar-gap > max_cal_gap days (e.g. the 256-day hole in ^NSMIDCP).
+    2. Single-day price change > max_single_day_chg in absolute value
+       (e.g. yfinance joining Nifty Midcap 50 + Midcap 100 data = −33% on Nov 9 2015).
+
+    Without this, pct_change() across such boundaries looks like real giant moves
+    and blows up the rolling-return chart.
+    """
+    if s.empty or len(s) < 2:
+        return s
+    s = s.copy().astype(float)
+
+    # 1. Calendar-gap boundaries
+    cal_gaps = pd.Series(s.index, index=s.index).diff().dt.days
+    bad_cal  = cal_gaps[cal_gaps > max_cal_gap].index
+
+    # 2. Huge single-day price jumps (index stitching artefacts)
+    raw_chg  = s.pct_change(fill_method=None).abs()
+    bad_chg  = raw_chg[raw_chg > max_single_day_chg].index
+
+    bad_days = bad_cal.union(bad_chg)
+    s.loc[bad_days] = float("nan")
+    return s
 
 
 def _compute_spread(
@@ -132,6 +164,11 @@ def _compute_spread(
     common = s_a.index.intersection(s_b.index)
     s_a = s_a.reindex(common)
     s_b = s_b.reindex(common)
+
+    # Null out prices on the first day after any data gap > 10 calendar days.
+    # This stops rolling returns from "crossing" the gap and showing fake spikes.
+    s_a = _null_gap_boundaries(s_a)
+    s_b = _null_gap_boundaries(s_b)
 
     ra = _rolling_return(s_a, window)
     rb = _rolling_return(s_b, window)
@@ -323,10 +360,10 @@ def render() -> None:
         """
         <style>
         .pg-header { display:flex; flex-wrap:wrap; align-items:baseline;
-                     gap:8px; margin-bottom:8px; }
+                     gap:8px; margin-bottom:8px; padding-left:2px; overflow:visible; }
         .pg-title  { font-size:clamp(18px,4vw,26px); font-weight:700;
                      color:#58A6FF; font-family:IBM Plex Mono,monospace;
-                     letter-spacing:2px; white-space:nowrap; }
+                     letter-spacing:1px; white-space:nowrap; }
         .pg-sub    { font-size:clamp(11px,2vw,13px); color:#8B949E;
                      font-family:IBM Plex Mono,monospace; }
         </style>

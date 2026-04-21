@@ -73,10 +73,10 @@ def render(pe_ratio: float = 21.27) -> None:
         f"""
         <style>
         .pg-header {{ display:flex; flex-wrap:wrap; align-items:baseline;
-                      gap:8px; margin-bottom:8px; }}
+                      gap:8px; margin-bottom:8px; padding-left:2px; overflow:visible; }}
         .pg-title  {{ font-size:clamp(18px,4vw,26px); font-weight:700;
                       color:#58A6FF; font-family:IBM Plex Mono,monospace;
-                      letter-spacing:2px; white-space:nowrap; }}
+                      letter-spacing:1px; white-space:nowrap; }}
         .pg-sub    {{ font-size:clamp(11px,2vw,13px); color:#8B949E;
                       font-family:IBM Plex Mono,monospace; }}
         </style>

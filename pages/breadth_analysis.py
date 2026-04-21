@@ -279,10 +279,10 @@ def _header() -> None:
         f"""
         <style>
         .pg-header {{ display:flex; flex-wrap:wrap; align-items:baseline;
-                      gap:8px; margin-bottom:4px; }}
+                      gap:8px; margin-bottom:4px; padding-left:2px; overflow:visible; }}
         .pg-title  {{ font-size:clamp(16px,3.5vw,26px); font-weight:700;
                       color:{_BLUE}; font-family:{_FONT};
-                      letter-spacing:2px; white-space:nowrap; }}
+                      letter-spacing:1px; white-space:nowrap; }}
         .pg-sub    {{ font-size:clamp(10px,2vw,12px); color:{_GREY};
                       font-family:{_FONT}; }}
         </style>
