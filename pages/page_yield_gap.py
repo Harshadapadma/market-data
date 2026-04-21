@@ -68,10 +68,23 @@ def _date_filter(key: str = "yg") -> tuple[date, date]:
 def render(pe_ratio: float = 21.27) -> None:
     """Render the full Yield Gap page.  pe_ratio comes from the sidebar input."""
 
-    # ── Sub-header ────────────────────────────────────────────────────────────
+    # ── Page header ───────────────────────────────────────────────────────────
     st.markdown(
-        "<div style='font-size:12px;color:#8B949E;font-family:IBM Plex Mono,monospace;"
-        "margin-bottom:10px'>India 10Y Bond Yield − Nifty 50 Earnings Yield</div>",
+        """
+        <style>
+        .pg-header { display:flex; flex-wrap:wrap; align-items:baseline;
+                     gap:8px; margin-bottom:8px; padding-left:2px; overflow:visible; }
+        .pg-title  { font-size:clamp(18px,4vw,26px); font-weight:700;
+                     color:#58A6FF; font-family:IBM Plex Mono,monospace;
+                     letter-spacing:1px; white-space:nowrap; }
+        .pg-sub    { font-size:clamp(11px,2vw,13px); color:#8B949E;
+                     font-family:IBM Plex Mono,monospace; }
+        </style>
+        <div class='pg-header'>
+            <span class='pg-title'>⬡ YIELD GAP</span>
+            <span class='pg-sub'>India 10Y Bond Yield − Nifty 50 Earnings Yield</span>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
