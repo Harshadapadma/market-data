@@ -1,6 +1,6 @@
 """
 pages/page_spread.py
-Return Spread — any two instruments
+Return Spread 
 ─────────────────────────────────────
 Plots the rolling return difference:
     Spread = Rolling-N-day return (A)  −  Rolling-N-day return (B)
@@ -301,7 +301,7 @@ def render() -> None:
         """
         <div class='pg-header'>
             <span class='pg-title'>&#8644; RETURN SPREAD</span>
-            <span class='pg-sub'>Any two instruments &nbsp;·&nbsp; Rolling return diff with Avg / ±1σ / ±2σ bands</span>
+            <span class='pg-sub'> &nbsp;·&nbsp; Rolling return diff with Avg / ±1σ / ±2σ bands</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -311,13 +311,13 @@ def render() -> None:
     cc1, cc2 = st.columns(2)
     with cc1:
         name_a = st.selectbox(
-            "Instrument A", all_names,
+            "Index A", all_names,
             index=all_names.index("Nifty 50") if "Nifty 50" in all_names else 0,
             key="sp_custom_a",
         )
     with cc2:
         name_b = st.selectbox(
-            "Instrument B", all_names,
+            "Index B", all_names,
             index=all_names.index("Gold BeES (Nippon)") if "Gold BeES (Nippon)" in all_names else 1,
             key="sp_custom_b",
         )
