@@ -33,7 +33,7 @@ _RED    = "#F85149"
 _YELLOW = "#F0883E"
 _GREY   = "#8B949E"
 _WHITE  = "#E6EDF3"
-_FONT   = "IBM Plex Mono, monospace"
+_FONT   = "Inter, sans-serif"
 
 
 # ── Plotly chart builders ─────────────────────────────────────────────────────
@@ -181,11 +181,11 @@ def plot_breadth_time_series(
 
     # ── Std-dev band lines ───────────────────────────────────────────────────
     sd_levels = [
-        (f"+2s  {min(mean + 2 * std, 100):.1f}%", min(mean + 2 * std, 100), "#00CED1", "dash"),
-        (f"+1s  {min(mean +     std, 100):.1f}%", min(mean +     std, 100), "#3FB950", "dash"),
-        (f"Avg  {mean:.1f}%",                      mean,                     "#F0883E", "solid"),
-        (f"-1s  {max(mean -     std,   0):.1f}%", max(mean -     std,   0), "#D2A8FF", "dash"),
-        (f"-2s  {max(mean - 2 * std,   0):.1f}%", max(mean - 2 * std,   0), "#F85149", "dash"),
+        (f"+2σ  {min(mean + 2 * std, 100):.1f}%", min(mean + 2 * std, 100), "#00CED1", "dash"),
+        (f"+1σ  {min(mean +     std, 100):.1f}%", min(mean +     std, 100), "#3FB950", "dash"),
+        (f"Mean {mean:.1f}%",                      mean,                     "#F0883E", "solid"),
+        (f"−1σ  {max(mean -     std,   0):.1f}%", max(mean -     std,   0), "#D2A8FF", "dash"),
+        (f"−2σ  {max(mean - 2 * std,   0):.1f}%", max(mean - 2 * std,   0), "#F85149", "dash"),
     ]
     for label, level, colour, dash in sd_levels:
         fig.add_hline(y=level, line=dict(color=colour, width=1.2, dash=dash))
@@ -289,10 +289,9 @@ def _metric(label: str, value: str, color: str = _BLUE) -> str:
 def _header() -> None:
     st.markdown(
         "<div class='pg-header'>"
-        "<span class='pg-title'>&#128202; INDEX BREADTH ANALYSER</span>"
-        "<span class='pg-sub'>What % of stocks outperform the Benchmark rolling return?</span>"
-        "</div>"
-        f"<hr style='border-color:{_BORDER};margin:10px 0 18px 0'>",
+        "<span class='pg-title'>Market Breadth</span>"
+        "<span class='pg-sub'>Percentage of index constituents outperforming the benchmark on a rolling return basis</span>"
+        "</div>",
         unsafe_allow_html=True,
     )
 
@@ -313,7 +312,7 @@ def render_breadth_analysis() -> None:
     show_bench_px  = False
 
     with st.sidebar:
-        st.markdown("**📅 Date Range**")
+        st.markdown("**Date Range**")
         today      = date.today()
         data_start = date(2006, 1, 1)
         from datetime import timedelta as _td

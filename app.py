@@ -33,9 +33,9 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap');
     html, body, [class*="css"] {
-        font-family: 'IBM Plex Sans', sans-serif;
+        font-family: 'Inter', sans-serif;
         background-color: #0D1117;
         color: #E6EDF3;
     }
@@ -60,32 +60,38 @@ st.markdown(
     div[data-testid="stMetric"] {
         background: #161B22;
         border: 1px solid #21262D;
-        border-radius: 8px;
+        border-radius: 4px;
         padding: 10px 14px;
     }
     div[data-testid="stMetric"] label {
         color: #8B949E !important;
         font-size: 11px !important;
+        font-weight: 500 !important;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 0.6px;
+        font-family: 'Inter', sans-serif !important;
     }
     div[data-testid="stMetric"] [data-testid="stMetricValue"] {
         font-size: clamp(14px, 2.5vw, 20px) !important;
+        font-family: 'IBM Plex Mono', monospace !important;
+        font-weight: 600 !important;
     }
 
     /* ── Radio buttons ──────────────────────────────────────────────────── */
     div[data-testid="stRadio"] > div { gap: 4px; }
     div[data-testid="stRadio"] label {
         border: 1px solid #21262D;
-        border-radius: 6px;
-        padding: 6px 12px;
+        border-radius: 4px;
+        padding: 5px 12px;
         background: #161B22;
         cursor: pointer;
+        font-size: 13px !important;
+        font-family: 'Inter', sans-serif !important;
     }
-    div[data-testid="stRadio"] label:hover { border-color: #58A6FF; }
+    div[data-testid="stRadio"] label:hover { border-color: #4A90D9; }
 
     /* ── General layout ─────────────────────────────────────────────────── */
-    .stAlert { border-radius: 8px; }
+    .stAlert { border-radius: 4px; }
     .block-container {
         padding-top: 3.5rem !important;
         padding-bottom: 2rem;
@@ -97,25 +103,29 @@ st.markdown(
         display: flex !important;
         flex-wrap: wrap !important;
         align-items: baseline !important;
-        gap: 8px !important;
-        margin-bottom: 8px !important;
+        gap: 10px !important;
+        margin-bottom: 12px !important;
         overflow: visible !important;
         width: 100% !important;
+        border-bottom: 1px solid #21262D;
+        padding-bottom: 10px !important;
     }
     .pg-title {
-        font-size: clamp(14px, 4vw, 24px) !important;
-        font-weight: 700 !important;
-        color: #58A6FF !important;
-        font-family: IBM Plex Mono, monospace !important;
+        font-size: clamp(14px, 3vw, 18px) !important;
+        font-weight: 600 !important;
+        color: #E6EDF3 !important;
+        font-family: 'Inter', sans-serif !important;
+        letter-spacing: 0.5px !important;
         white-space: nowrap !important;
         overflow: visible !important;
     }
     .pg-sub {
         font-size: clamp(10px, 2vw, 12px) !important;
-        color: #8B949E !important;
-        font-family: IBM Plex Mono, monospace !important;
+        color: #6E7681 !important;
+        font-family: 'Inter', sans-serif !important;
         white-space: normal !important;
         line-height: 1.4 !important;
+        font-weight: 400 !important;
     }
 
     /* ── Mobile ──────────────────────────────────────────────────────────── */
@@ -161,7 +171,7 @@ st.markdown(
             min-width: 100% !important;
             flex: 1 1 100% !important;
         }
-        .pg-title { font-size: 16px !important; white-space: normal !important; }
+        .pg-title { font-size: 15px !important; white-space: normal !important; }
     }
     </style>
     """,
@@ -174,18 +184,18 @@ setup_logging()
 with st.sidebar:
     st.markdown(
         "<div style=\"padding:10px 0 4px 0\">"
-        "<span style=\"font-size:20px;font-weight:700;letter-spacing:1px;"
-        "color:#58A6FF;font-family:IBM Plex Mono,monospace\">"
-        "📈 INDIA MACRO"
+        "<span style=\"font-size:15px;font-weight:600;letter-spacing:0.3px;"
+        "color:#E6EDF3;font-family:'Inter',sans-serif\">"
+        "India Macro Dashboard"
         "</span></div>"
         "<hr style=\"border-color:#21262D;margin:6px 0 14px 0\">",
         unsafe_allow_html=True,
     )
 
     PAGE_OPTIONS = {
-        "Yield Gap":          "yield_gap",
-        "Return Spread":      "spread",
-        "Outperformance  ": "breadth",
+        "Yield Gap":       "yield_gap",
+        "Return Spread":   "spread",
+        "Outperformance":  "breadth",
     }
     page_label = st.radio(
         "page",
@@ -216,7 +226,7 @@ with st.sidebar:
             key="sb_pe_ratio",
         )
 
-        if st.button("🔄 Refresh Data", use_container_width=True):
+        if st.button("Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
@@ -235,7 +245,7 @@ with st.sidebar:
                 "Bond Yield (%)", min_value=0.0, max_value=20.0,
                 value=0.0, step=0.01, format="%.3f", key="me_bond",
             )
-            if st.form_submit_button("💾 Save"):
+            if st.form_submit_button("Save"):
                 if manual_bond > 0:
                     save_manual_entry(str(entry_date), manual_bond, None, MANUAL_CACHE)
                     st.success("Saved!")
@@ -256,9 +266,7 @@ with st.sidebar:
         pe_ratio = 21.27
 
     st.markdown(
-        "<hr style='border-color:#21262D;margin:10px 0'>"
-        "<div style='font-size:10px;color:#484F58;font-family:IBM Plex Mono,monospace'>"
-        "</div>",
+        "<hr style='border-color:#21262D;margin:10px 0'>",
         unsafe_allow_html=True,
     )
 

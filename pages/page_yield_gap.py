@@ -68,15 +68,15 @@ def render(pe_ratio: float = 21.27) -> None:
     st.markdown(
         """
         <div class='pg-header'>
-            <span class='pg-title'>&#11041; YIELD GAP</span>
-            <span class='pg-sub'>India 10Y Bond Yield &#8722; Nifty 50 Earnings Yield</span>
+            <span class='pg-title'>Yield Gap</span>
+            <span class='pg-sub'>India 10Y Bond Yield &minus; Nifty 50 Earnings Yield (1/PE &times; 100)</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
     # ── Date filter ───────────────────────────────────────────────────────────
-    st.markdown("**📅 Date range**")
+    st.markdown("**Date range**")
     date_from, date_to = _date_filter("yg")
 
     # ── Load data ─────────────────────────────────────────────────────────────
@@ -115,8 +115,7 @@ def render(pe_ratio: float = 21.27) -> None:
     if not bond_status.get("daily", True):
         st.warning(
             "Bond yield is using FRED monthly data. "
-            "Install curl_cffi and restart for daily Stooq data.",
-            icon="📡",
+            "Install curl_cffi and restart for daily Stooq data."
         )
 
     # ── Apply date filter ─────────────────────────────────────────────────────
@@ -178,7 +177,7 @@ def render(pe_ratio: float = 21.27) -> None:
     )
 
     # ── Raw data table ────────────────────────────────────────────────────────
-    with st.expander("📋 Raw Data", expanded=False):
+    with st.expander("Raw Data", expanded=False):
         display_df = df[["bond_yield", "earnings_yield", "yield_gap", "yield_gap_ma20"]].copy()
         display_df.index = display_df.index.date
         display_df.columns = [

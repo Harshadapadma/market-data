@@ -31,7 +31,7 @@ _RED   = "#F85149"
 _ORG   = "#F0883E"
 _PURP  = "#D2A8FF"
 _CYAN  = "#00CED1"
-_FONT  = "IBM Plex Mono, monospace"
+_FONT  = "Inter, sans-serif"
 
 _H         = 460
 DATA_START = "2006-01-01"
@@ -213,16 +213,16 @@ def plot_spread_with_bands(
     std  = stats["std"]
 
     sd_levels = [
-        (f"+2s  ({mean + 2*std:+.2f}%)", mean + 2*std, _CYAN,  "dash"),
-        (f"+1s  ({mean +   std:+.2f}%)", mean +   std, _GREEN, "dash"),
-        (f"Avg  ({mean:+.2f}%)",          mean,         _ORG,   "solid"),
-        (f"-1s  ({mean -   std:+.2f}%)", mean -   std, _PURP,  "dash"),
-        (f"-2s  ({mean - 2*std:+.2f}%)", mean - 2*std, _RED,   "dash"),
+        (f"+2σ  ({mean + 2*std:+.2f}%)", mean + 2*std, _CYAN,  "dash"),
+        (f"+1σ  ({mean +   std:+.2f}%)", mean +   std, _GREEN, "dash"),
+        (f"Mean ({mean:+.2f}%)",          mean,         _ORG,   "solid"),
+        (f"−1σ  ({mean -   std:+.2f}%)", mean -   std, _PURP,  "dash"),
+        (f"−2σ  ({mean - 2*std:+.2f}%)", mean - 2*std, _RED,   "dash"),
     ]
 
     span_years = (spread.index[-1] - spread.index[0]).days / 365.25 if len(spread) >= 2 else 99
     fig = _base_fig(
-        f"Return Spread  -  {name_a} vs {name_b}  ({window_label})",
+        f"Return Spread — {name_a} vs {name_b}  ({window_label})",
         right_margin=155,
         span_years=span_years,
     )
@@ -276,7 +276,7 @@ def plot_rolling_returns(
 ) -> go.Figure:
     span_years = (ra.index[-1] - ra.index[0]).days / 365.25 if len(ra) >= 2 else 99
     fig = _base_fig(
-        f"Rolling {window_label} Return  -  {name_a}  vs  {name_b}",
+        f"Rolling {window_label} Return — {name_a} vs {name_b}",
         right_margin=20,
         span_years=span_years,
     )
@@ -300,8 +300,8 @@ def render() -> None:
     st.markdown(
         """
         <div class='pg-header'>
-            <span class='pg-title'>&#8644; RETURN SPREAD</span>
-            <span class='pg-sub'> &nbsp;·&nbsp; Rolling return diff with Avg / ±1σ / ±2σ bands</span>
+            <span class='pg-title'>Return Spread</span>
+            <span class='pg-sub'>Rolling return differential &mdash; Mean / &plusmn;1&sigma; / &plusmn;2&sigma; bands</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -324,8 +324,6 @@ def render() -> None:
     ticker_a = INSTRUMENTS[name_a]
     ticker_b = INSTRUMENTS[name_b]
 
-    st.divider()
-
     window_opts = {
         "1M  (21D)":  21,
         "3M  (63D)":  63,
@@ -339,7 +337,7 @@ def render() -> None:
     )
     window = window_opts[wlabel]
 
-    st.markdown("**📅 Date range**")
+    st.markdown("**Date range**")
     date_from, date_to = _date_filter()
 
     with st.spinner(f"Loading {name_a} and {name_b}..."):
@@ -382,13 +380,13 @@ def render() -> None:
 
     m1, m2, m3, m4 = st.columns([1, 1, 1, 1])
     with m1:
-        st.metric("Spread Now", f"{last:+.2f}%")
+        st.metric("Current Spread", f"{last:+.2f}%")
     with m2:
-        st.metric("Avg (full hist)", f"{mean:+.2f}%")
+        st.metric("Historical Mean", f"{mean:+.2f}%")
     with m3:
-        st.metric("Std Dev", f"{std:.2f}%", delta=f"Z: {z:+.2f}", delta_color="off")
+        st.metric("Std Deviation", f"{std:.2f}%", delta=f"Z-score: {z:+.2f}", delta_color="off")
     with m4:
-        st.metric("vs Avg", f"{delta:+.2f}%", delta_color="normal")
+        st.metric("Deviation vs Mean", f"{delta:+.2f}%", delta_color="normal")
 
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 
@@ -404,7 +402,7 @@ def render() -> None:
         config={"responsive": True},
     )
 
-    with st.expander("📋 Raw data", expanded=False):
+    with st.expander("Raw Data", expanded=False):
         raw_df = pd.DataFrame({
             f"{name_a} {wlabel} Return (%)": ra_view,
             f"{name_b} {wlabel} Return (%)": rb_view,
@@ -429,7 +427,7 @@ def render() -> None:
             mime="text/csv",
         )
 
-    with st.expander("📡 Data sources", expanded=False):
+    with st.expander("Data Sources", expanded=False):
         for name, status in [(name_a, status_a), (name_b, status_b)]:
             ok = "✅" if status["success"] else "⚠️"
             st.caption(f"{ok} **{name}**: {status['message']}")

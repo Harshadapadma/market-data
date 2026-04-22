@@ -37,7 +37,7 @@ THEME = {
     "ref_zero":       "#8B949E",
 }
 
-_FONT_FAMILY = "'IBM Plex Mono', monospace"
+_FONT_FAMILY = "'Inter', 'IBM Plex Mono', sans-serif"
 
 
 # ─────────────────────────────────────────────
@@ -159,11 +159,11 @@ def plot_yield_gap_with_bands(
     std  = float(_gap_full.std())
 
     sd_levels = [
-        (f"+2σ ({mean + 2*std:+.2f}%)", mean + 2*std, "#00CED1", "dash"),
-        (f"+1σ ({mean +   std:+.2f}%)", mean +   std, "#3FB950", "dash"),
-        (f"Mean ({mean:+.2f}%)",         mean,         "#F0883E", "solid"),
-        (f"-1σ ({mean -   std:+.2f}%)", mean -   std, "#D2A8FF", "dash"),
-        (f"-2σ ({mean - 2*std:+.2f}%)", mean - 2*std, "#F85149", "dash"),
+        (f"+2σ  ({mean + 2*std:+.2f}%)", mean + 2*std, "#00CED1", "dash"),
+        (f"+1σ  ({mean +   std:+.2f}%)", mean +   std, "#3FB950", "dash"),
+        (f"Mean ({mean:+.2f}%)",          mean,         "#F0883E", "solid"),
+        (f"−1σ  ({mean -   std:+.2f}%)", mean -   std, "#D2A8FF", "dash"),
+        (f"−2σ  ({mean - 2*std:+.2f}%)", mean - 2*std, "#F85149", "dash"),
     ]
 
     for _, level, colour, dash in sd_levels:
@@ -209,7 +209,7 @@ def plot_yield_gap_with_bands(
 
     _dark_layout(
         fig,
-        title="Yield Gap  .  Historical Mean  .  +/-1s / +/-2s",
+        title="Yield Gap — Historical Mean ± 1σ / ± 2σ",
         height=420,
         span_years=span_years,
         right_margin=150,   # space reserved for the outside labels
@@ -245,7 +245,7 @@ def plot_distribution(df: pd.DataFrame) -> go.Figure:
         annotation_position="top right",
     )
 
-    _dark_layout(fig, title="Yield Gap - Historical Distribution",
+    _dark_layout(fig, title="Yield Gap — Historical Distribution",
                  height=260, right_margin=20)
     fig.update_layout(
         yaxis=dict(ticksuffix="", title="Count"),
