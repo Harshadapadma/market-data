@@ -423,18 +423,21 @@ def get_price(
         # ── Forward-fill: cache doesn't reach today ───────────────────────────
         if last_cached < today:
             fwd_start = str(last_cached + timedelta(days=1))
-            if use_nse:
-                fwd = _fetch_from_nse_archive(nse_name, fwd_start, str(today))
-                if not fwd.empty:
-                    pieces.append(fwd)
+            # Always try yfinance first — it has near-real-time data and works
+            # during trading hours, unlike NSE archives which are only published
+            # after market close (~7 PM IST).  NSE archives are a fallback only.
+            fwd = _fetch_yfinance(ticker, fwd_start, fetch_end)
+            if not fwd.empty:
+                pieces.append(fwd)
+                if status["source"] == "cache":
+                    status["source"] = "yfinance (incremental)"
+            elif use_nse:
+                # yfinance returned nothing — try NSE archives (post-close fallback)
+                fwd2 = _fetch_from_nse_archive(nse_name, fwd_start, str(today))
+                if not fwd2.empty:
+                    pieces.append(fwd2)
                     if status["source"] == "cache":
                         status["source"] = "NSE archives (incremental)"
-            else:
-                fwd = _fetch_yfinance(ticker, fwd_start, fetch_end)
-                if not fwd.empty:
-                    pieces.append(fwd)
-                    if status["source"] == "cache":
-                        status["source"] = "yfinance (incremental)"
         else:
             if not pieces:
                 status["message"] = f"Cached {len(cached)} rows up to {last_cached}"
