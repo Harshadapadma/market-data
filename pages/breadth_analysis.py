@@ -148,9 +148,14 @@ def plot_breadth_time_series(
         hover_count = df["count_eligible"]
         hover_bench = df["benchmark_return"]
 
+    hover_above = (hover_pct / 100.0 * hover_count).round()
+    hover_below = (hover_count - hover_above).round()
+
     cd = np.column_stack([
         hover_count.values.astype(float),
         hover_bench.values.astype(float),
+        hover_above.values.astype(float),
+        hover_below.values.astype(float),
     ])
 
     fig.add_trace(go.Scatter(
@@ -162,9 +167,11 @@ def plot_breadth_time_series(
         line=dict(color="rgba(0,0,0,0)", width=16),
         customdata=cd,
         hovertemplate=(
-            "Breadth: <b>%{y:.1f}%</b> beating benchmark<br>"
-            "Benchmark return: %{customdata[1]:.1f}%<br>"
-            "Eligible stocks: %{customdata[0]:.0f}"
+            "<b>%{y:.1f}%</b> of stocks beat benchmark<br>"
+            "Above: %{customdata[2]:.0f} &nbsp;|&nbsp; "
+            "Below: %{customdata[3]:.0f} &nbsp;|&nbsp; "
+            "Total: %{customdata[0]:.0f}<br>"
+            "Benchmark return: %{customdata[1]:.1f}%"
             "<extra></extra>"
         ),
     ))
