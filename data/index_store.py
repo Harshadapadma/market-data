@@ -129,6 +129,7 @@ def _load_csv(path: Path) -> pd.Series:
     df = df.dropna(subset=["date", "close"])
     s = df.set_index("date")["close"].sort_index()
     s.index = pd.to_datetime(s.index)
+    s = s[~s.index.duplicated(keep="last")]  # guard against any stale dupes in CSV
     return s
 
 
@@ -469,6 +470,8 @@ def get_price(
 
     # ── Combine ───────────────────────────────────────────────────────────────
     if pieces:
+        # cached is concat'd first, fresh pieces last → keep="last" always
+        # retains the newly fetched value over the old cached one for the same date
         combined = pd.concat([cached] + pieces).sort_index()
         combined = combined[~combined.index.duplicated(keep="last")]
         if not use_nse:
