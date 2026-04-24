@@ -118,6 +118,10 @@ def _compute_spread(
     s_a = s_a[s_a.index >= effective_start]
     s_b = s_b[s_b.index >= effective_start]
 
+    # Drop duplicate dates (yfinance occasionally returns duplicate rows)
+    s_a = s_a[~s_a.index.duplicated(keep="last")]
+    s_b = s_b[~s_b.index.duplicated(keep="last")]
+
     common = s_a.index.intersection(s_b.index)
     s_a = s_a.reindex(common)
     s_b = s_b.reindex(common)
