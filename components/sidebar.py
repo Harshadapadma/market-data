@@ -26,7 +26,7 @@ def render_sidebar(fetched_pe: float = 21.27) -> dict:
                 ⬡ YIELD GAP
             </span><br>
             <span style='font-size:11px;color:#8B949E;font-family:IBM Plex Mono,monospace'>
-                INDIA MACRO DASHBOARD
+                Options
             </span>
         </div>
         <hr style='border-color:#21262D;margin:8px 0 16px 0'>

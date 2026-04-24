@@ -296,7 +296,7 @@ def _metric(label: str, value: str, color: str = _BLUE) -> str:
 def _header() -> None:
     st.markdown(
         "<div class='pg-header'>"
-        "<span class='pg-title'>Market Breadth</span>"
+        "<span class='pg-title'>Outperformance</span>"
         "<span class='pg-sub'>Percentage of index constituents outperforming the benchmark on a rolling return basis</span>"
         "</div>",
         unsafe_allow_html=True,
@@ -384,13 +384,11 @@ def render_breadth_analysis() -> None:
     bench_info = BENCHMARK_CATALOG[benchmark_name]
 
     with info_cols[0]:
-        st.markdown(_metric("Universe", universe_name, _BLUE), unsafe_allow_html=True)
+        st.markdown(_metric("Index", universe_name, _BLUE), unsafe_allow_html=True)
     with info_cols[1]:
         st.markdown(_metric("Approx. size", f"~{univ_info['approx_size']} stocks", _GREY), unsafe_allow_html=True)
     with info_cols[2]:
         st.markdown(_metric("Benchmark", benchmark_name, _YELLOW), unsafe_allow_html=True)
-    with info_cols[3]:
-        st.markdown(_metric("Window", window_label.split("(")[0].strip(), _GREEN), unsafe_allow_html=True)
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
@@ -539,7 +537,7 @@ def _render_results(
     col_color = _GREEN if latest >= 50 else _RED
     m1, m2, m3, m4, m5 = st.columns(5)
     with m1:
-        st.markdown(_metric("Latest Breadth", f"{latest:.1f}%", col_color), unsafe_allow_html=True)
+        st.markdown(_metric("Latest % Beating", f"{latest:.1f}%", col_color), unsafe_allow_html=True)
     with m2:
         st.markdown(_metric("Full-History Avg", f"{avg_breadth:.1f}%", _GREY), unsafe_allow_html=True)
     with m3:
@@ -626,7 +624,7 @@ def _render_results(
                 mime="text/csv",
             )
 
-    with st.expander("Raw Breadth Data", expanded=False):
+    with st.expander("Data", expanded=False):
         st.dataframe(
             df.sort_index(ascending=False).style.format({
                 "pct_beating":         "{:.1f}",
@@ -638,7 +636,7 @@ def _render_results(
             height=300,
         )
         st.download_button(
-            "Download Breadth CSV",
+            "Download CSV",
             data=df.reset_index().to_csv(index=False),
             file_name=f"breadth_{universe_name.replace(' ', '_')}_vs_{benchmark_name.replace(' ', '_')}.csv",
             mime="text/csv",

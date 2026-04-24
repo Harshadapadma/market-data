@@ -1,5 +1,5 @@
 """
-app.py – India Macro Dashboard
+app.py – Options
 Pages:
   1. Yield          – India 10Y Bond Yield vs Nifty 50 Earnings Yield
   2. Nifty vs Gold  – Nifty 50 / Gold BeES rolling return spread + SD bands
@@ -24,7 +24,7 @@ import streamlit as st
 from utils.config import APP_TITLE, APP_ICON, setup_logging
 
 st.set_page_config(
-    page_title="India Macro Dashboard",
+    page_title="Options",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -186,7 +186,7 @@ with st.sidebar:
         "<div style=\"padding:10px 0 4px 0\">"
         "<span style=\"font-size:15px;font-weight:600;letter-spacing:0.3px;"
         "color:#E6EDF3;font-family:'Inter',sans-serif\">"
-        "India Macro Dashboard"
+        "Options"
         "</span></div>"
         "<hr style=\"border-color:#21262D;margin:6px 0 14px 0\">",
         unsafe_allow_html=True,
